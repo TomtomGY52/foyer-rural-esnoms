@@ -2,7 +2,7 @@
 
 - `[x]` Installation de Node.js et npm sur Linux Mint
 - `[x]` Configuration de Git, création du `.gitignore` et premier commit local
-- `[ ]` Association avec le dépôt GitHub distant et push initial (À faire manuellement par l'utilisateur)
+- `[x]` Association avec le dépôt GitHub distant et push initial (Fait via jeton d'accès)
 - `[x]` Connexion au compte Firebase via CLI (`projects:list` ou `login`)
 - `[x]` Création du nouveau projet Firebase via CLI (`foyer-rural-esnoms`)
 - `[x]` Initialisation locale des fichiers de configuration Firebase (`firebase.json`, `firestore.rules`, `storage.rules`)
@@ -20,3 +20,4 @@
 - `[x]` Ajout d'un QR code de partage dynamique dans les paramètres
 - `[x]` Permettre la modification et la suppression complète de toutes les catégories (y compris les catégories système) sans retour automatique des anciennes valeurs
 - `[x]` Intégration du bouton de masquage/affichage de la barre latérale directement à l'intérieur du menu de gauche, avec mode "mini-sidebar" réduit (affiche uniquement le bouton) pour optimiser l'espace écran
+- `[x]` Configuration en PWA installable avec manifest.json et service worker (offline cache) pour l'installer directement sur l'écran d'accueil d'un smartphone

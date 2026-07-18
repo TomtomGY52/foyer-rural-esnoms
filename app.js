@@ -297,7 +297,7 @@ function connectFirebase() {
                         }
                         
                         // Refresh logo in UI
-                        const logoUrl = localStorage.getItem("foyer_logo_url") || "logo.png";
+                        const logoUrl = localStorage.getItem("foyer_logo_url") || "logo.png?v=2.2";
                         const opacity = localStorage.getItem("foyer_logo_opacity") !== null ? 
                             Number(localStorage.getItem("foyer_logo_opacity")) : 0.05;
                         renderLogo(logoUrl, opacity);
@@ -355,7 +355,7 @@ function connectFirebase() {
                 const appContainer = document.querySelector(".app-container");
                 if (appContainer) appContainer.style.display = "none";
                 
-                const logoUrl = localStorage.getItem("foyer_logo_url") || "logo.png";
+                const logoUrl = localStorage.getItem("foyer_logo_url") || "logo.png?v=2.2";
                 const loginLogoImg = document.getElementById("login-logo-img");
                 if (loginLogoImg) loginLogoImg.src = logoUrl;
             }
@@ -4579,7 +4579,7 @@ function getPeriodMonthIndex(d) {
 
 // --- LOGO PERSONALIZATION HELPERS ---
 function initLogo() {
-    const logoUrl = localStorage.getItem("foyer_logo_url") || "logo.png";
+    const logoUrl = localStorage.getItem("foyer_logo_url") || "logo.png?v=2.2";
     const logoOpacityVal = localStorage.getItem("foyer_logo_opacity") !== null ? 
         Number(localStorage.getItem("foyer_logo_opacity")) : 0.05;
         
@@ -4660,7 +4660,7 @@ function updateLogoOpacityFromRange(val) {
     const opacity = Number(val) / 100;
     localStorage.setItem("foyer_logo_opacity", opacity);
     
-    const logoUrl = localStorage.getItem("foyer_logo_url") || "logo.png";
+    const logoUrl = localStorage.getItem("foyer_logo_url") || "logo.png?v=2.2";
     renderLogo(logoUrl, opacity);
     
     const opacityValue = document.getElementById("logo-opacity-value");

@@ -1,10 +1,10 @@
-const CACHE_NAME = 'foyer-rural-cache-v2.1';
+const CACHE_NAME = 'foyer-rural-cache-v2.2';
 const ASSETS = [
   '/',
-  '/index.html',
-  '/index.css',
-  '/app.js',
-  '/logo.png'
+  '/index.html?v=2.2',
+  '/index.css?v=2.2',
+  '/app.js?v=2.2',
+  '/logo.png?v=2.2'
 ];
 
 // Install Event
@@ -33,7 +33,6 @@ self.addEventListener('activate', e => {
 
 // Fetch Event (Network-first fallback to cache)
 self.addEventListener('fetch', e => {
-  // Only cache GET requests and skip firebase/firestore/auth dynamic requests
   if (e.request.method !== 'GET' || e.request.url.includes('/__/firebase/') || e.request.url.includes('googleapis.com')) {
     return;
   }
