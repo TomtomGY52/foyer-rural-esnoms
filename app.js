@@ -624,6 +624,12 @@ function setupNavigation() {
             item.classList.add("active");
             document.getElementById(`tab-${tabId}`).classList.add("active");
             
+            // Close mobile sidebar if open
+            const sidebar = document.querySelector(".sidebar");
+            if (sidebar && sidebar.classList.contains("open")) {
+                toggleSidebarMenu();
+            }
+            
             // Special initialization on tab display
             if (tabId === "dashboard") {
                 renderDashboard();
@@ -638,6 +644,19 @@ function setupNavigation() {
             lucide.createIcons();
         });
     });
+}
+
+function toggleSidebarMenu() {
+    const sidebar = document.querySelector(".sidebar");
+    const backdrop = document.getElementById("sidebar-backdrop");
+    
+    if (sidebar) {
+        sidebar.classList.toggle("open");
+        const isOpen = sidebar.classList.contains("open");
+        if (backdrop) {
+            backdrop.style.display = isOpen ? "block" : "none";
+        }
+    }
 }
 
 function setupSubNavigation() {

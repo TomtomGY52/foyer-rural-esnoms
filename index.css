@@ -363,16 +363,80 @@ body {
         flex-direction: column;
     }
     .sidebar {
-        width: 100%;
-        border-right: none;
-        border-bottom: 1px solid var(--border-color);
-        padding: 16px;
+        position: fixed;
+        top: 60px;
+        left: -280px;
+        width: 280px;
+        height: calc(100vh - 60px);
+        background: var(--bg-surface);
+        z-index: 1000;
+        transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 4px 0 12px rgba(0, 0, 0, 0.05);
+        border-right: 1px solid var(--border-color);
+        padding: 20px;
+        overflow-y: auto;
+    }
+    .sidebar.open {
+        left: 0;
+    }
+    #sidebar-backdrop {
+        position: fixed;
+        top: 60px;
+        left: 0;
+        width: 100vw;
+        height: calc(100vh - 60px);
+        background: rgba(15, 23, 42, 0.3);
+        backdrop-filter: blur(2px);
+        z-index: 999;
+        animation: fadeIn 0.2s ease-out;
     }
     .main-content {
-        padding: 20px;
+        padding: 16px;
+        margin-top: 60px;
+        width: 100%;
+        overflow-x: hidden;
+    }
+    .mobile-header {
+        display: flex !important;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 16px;
+        height: 60px;
+        background: var(--bg-surface);
+        border-bottom: 1px solid var(--border-color);
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        z-index: 1001;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
     }
     .dashboard-sections {
         grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    /* Horizontal scrolling for tables on mobile so they don't break layout */
+    .table-container, .card-table-wrapper, table {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    /* Adjust grid layouts on mobile */
+    .grid, .grid-3, .grid-4, .stats-grid, .stands-grid, .partners-grid {
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+    }
+    /* Modals should fit mobile screens cleanly */
+    .modal-content {
+        width: 95% !important;
+        max-width: 95% !important;
+        margin: 10px auto !important;
+        padding: 16px !important;
+    }
+    .form-row {
+        flex-direction: column;
+        gap: 0;
     }
 }
 
