@@ -1,0 +1,22 @@
+# Antigravity & Agent environment directories
+.gemini/
+.agents/
+
+# Dependency directories
+node_modules/
+
+# Firebase configuration & logs
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# User large spreadsheets & backups (excluding from public repo for safety)
+FR.xlsm
+BDD/
+
+# OS/Editor temporary files
+.DS_Store
+Thumbs.db
+*.tmp
+*~

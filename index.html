@@ -1,0 +1,1609 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion du Foyer Rural</title>
+    <script>
+        window.addEventListener('error', function(e) {
+            var errDiv = document.getElementById('debug-error-banner');
+            if (!errDiv) {
+                errDiv = document.createElement('div');
+                errDiv.id = 'debug-error-banner';
+                errDiv.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; background: #ef4444; color: white; padding: 12px; font-family: monospace; font-size: 13px; z-index: 99999; border-bottom: 2px solid #b91c1c; overflow-x: auto; white-space: pre-wrap;';
+                document.body.appendChild(errDiv);
+            }
+            errDiv.textContent += '\nError: ' + e.message + ' at ' + e.filename + ':' + e.lineno + ':' + e.colno;
+        });
+    </script>
+    <link rel="stylesheet" href="index.css">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Firebase Compat SDKs (allows running from file:// without CORS module issues) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <div id="main-bg-watermark" style="position: fixed; top: 50%; left: calc(50% + 130px); transform: translate(-50%, -50%); width: 500px; height: 500px; background-size: contain; background-repeat: no-repeat; background-position: center; pointer-events: none; opacity: 0.05; z-index: 0;"></div>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="logo-container" style="border-bottom: none; padding-bottom: 0;">
+                <img id="sidebar-logo" src="logo.png" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
+                <span class="logo-title">Foyer Rural d'Esnoms au Val</span>
+            </div>
+            
+            <!-- Global Period Selector -->
+            <div class="period-selector-sidebar" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; margin-bottom: 16px; border-bottom: 1px solid var(--border-color);">
+                <button class="btn btn-secondary btn-icon-only btn-sm" onclick="changePeriod(-1)" title="Période précédente" style="padding: 4px; border-radius: 4px; height: 28px; width: 28px;">
+                    <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i>
+                </button>
+                <span class="period-display" id="global-period-display" style="font-weight: 600; font-size: 0.95rem; color: var(--primary);">2025 / 2026</span>
+                <button class="btn btn-secondary btn-icon-only btn-sm" onclick="changePeriod(1)" title="Période suivante" style="padding: 4px; border-radius: 4px; height: 28px; width: 28px;">
+                    <i data-lucide="chevron-right" style="width: 16px; height: 16px;"></i>
+                </button>
+            </div>
+            
+            <nav>
+                <ul class="nav-menu">
+                    <li><a class="nav-item active" data-tab="dashboard"><i data-lucide="layout-dashboard"></i> Tableau de bord</a></li>
+                    <li><a class="nav-item" data-tab="adherents"><i data-lucide="users"></i> Adhérents</a></li>
+                    <li><a class="nav-item" data-tab="tennis"><i data-lucide="calendar"></i> Réservation Tennis</a></li>
+                    <li><a class="nav-item" data-tab="comptabilite"><i data-lucide="dollar-sign"></i> Comptabilité</a></li>
+                    <li><a class="nav-item" data-tab="bilan"><i data-lucide="bar-chart-3"></i> Bilan Financier</a></li>
+                    <li><a class="nav-item" data-tab="manifestations"><i data-lucide="sparkles"></i> Manifestations</a></li>
+                    <li><a class="nav-item" data-tab="reserve"><i data-lucide="beer"></i> Boissons & Réserve</a></li>
+                    <li><a class="nav-item" data-tab="investissements"><i data-lucide="trending-up"></i> Investissements</a></li>
+                    <li><a class="nav-item" data-tab="notes"><i data-lucide="file-text"></i> Réunions & Notes</a></li>
+                    <li><a class="nav-item" data-tab="settings"><i data-lucide="settings"></i> Paramètres / Firebase</a></li>
+                </ul>
+            </nav>
+            <div class="db-status-container">
+                <div class="db-status-badge">
+                    <span id="db-status-dot" class="status-dot"></span>
+                    <span id="db-status-text">Mode Local</span>
+                </div>
+                <div style="color: var(--text-muted); font-size: 0.75rem;" id="db-status-desc">Données sur ce navigateur</div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            
+            <!-- TAB: DASHBOARD -->
+            <section id="tab-dashboard" class="tab-pane active">
+                <div class="content-header">
+                    <div class="header-title">
+                        <h1>Bonjour !</h1>
+                        <p>Voici un aperçu de l'état du Foyer Rural aujourd'hui.</p>
+                    </div>
+                </div>
+                
+                <!-- Metrics Grid -->
+                <div class="dashboard-metrics">
+                    <div class="glass-panel metric-card primary">
+                        <div class="metric-info">
+                            <h3>Trésorerie Actuelle</h3>
+                            <div class="metric-value" id="dash-cash">0.00 €</div>
+                        </div>
+                        <div class="metric-icon"><i data-lucide="wallet"></i></div>
+                    </div>
+                    <div class="glass-panel metric-card success">
+                        <div class="metric-info">
+                            <h3>Adhérents Cotisants</h3>
+                            <div class="metric-value" id="dash-members">0</div>
+                        </div>
+                        <div class="metric-icon"><i data-lucide="users"></i></div>
+                    </div>
+                    <div class="glass-panel metric-card warning">
+                        <div class="metric-info">
+                            <h3>Alertes Stock Boissons</h3>
+                            <div class="metric-value" id="dash-stock-alerts">0</div>
+                        </div>
+                        <div class="metric-icon"><i data-lucide="alert-triangle"></i></div>
+                    </div>
+                    <div class="glass-panel metric-card danger">
+                        <div class="metric-info">
+                            <h3>Réservations Tennis (7j)</h3>
+                            <div class="metric-value" id="dash-tennis">0</div>
+                        </div>
+                        <div class="metric-icon"><i data-lucide="calendar"></i></div>
+                    </div>
+                </div>
+
+                <!-- Charts Section -->
+                <div class="dashboard-charts">
+                    <div class="glass-panel">
+                        <div class="chart-header">
+                            <h2>Flux Financiers</h2>
+                        </div>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="financeChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="glass-panel">
+                        <div class="chart-header">
+                            <h2>Répartition par Catégorie</h2>
+                        </div>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="categoryChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alert & Recent Activity Split -->
+                <div class="dashboard-sections">
+                    <div class="glass-panel">
+                        <div class="chart-header">
+                            <h2>Alertes & Actions Requises</h2>
+                        </div>
+                        <div id="dash-alerts-list" style="display: flex; flex-direction: column; gap: 12px;">
+                            <!-- Dynamic alerts -->
+                        </div>
+                    </div>
+                    <div class="glass-panel">
+                        <div class="chart-header">
+                            <h2>Dernières Transactions</h2>
+                        </div>
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Desc</th>
+                                        <th>Montant</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dash-recent-transactions">
+                                    <!-- Dynamic transactions -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: ADHERENTS -->
+            <section id="tab-adherents" class="tab-pane">
+                <div class="content-header">
+                    <div class="header-title">
+                        <h1>Membres & Adhérents</h1>
+                        <p>Gérez la liste des membres du foyer rural et le statut de leurs cotisations.</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-primary" onclick="openNewAdherentModal()">
+                            <i data-lucide="user-plus"></i> Nouvel Adhérent
+                        </button>
+                    </div>
+                </div>
+
+                <div class="glass-panel">
+                    <div class="form-row" style="margin-bottom: 20px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <input type="text" id="search-adherent" placeholder="Rechercher par nom ou prénom..." oninput="renderAdherentsList()">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <select id="filter-cotisation" onchange="renderAdherentsList()">
+                                <option value="all">Toutes les cotisations</option>
+                                <option value="up-to-date">Cotisation à jour</option>
+                                <option value="overdue">Cotisation non réglée</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>N° Adhérent</th>
+                                    <th>Nom Complet</th>
+                                    <th>Email</th>
+                                    <th>Date d'Adhésion</th>
+                                    <th>Cotisation</th>
+                                    <th>Gestanet</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adherents-table-body">
+                                <!-- Dynamic members -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: TENNIS -->
+            <section id="tab-tennis" class="tab-pane">
+                <div class="content-header">
+                    <div class="header-title">
+                        <h1>Réservation du Terrain de Tennis</h1>
+                        <p>Visualisez le planning hebdomadaire et réservez des créneaux horaires.</p>
+                    </div>
+                </div>
+
+                <div class="glass-panel">
+                    <div class="calendar-nav">
+                        <button class="btn btn-secondary btn-icon-only" onclick="changeWeek(-1)">
+                            <i data-lucide="chevron-left"></i>
+                        </button>
+                        <h2 id="calendar-week-title">Semaine du ...</h2>
+                        <button class="btn btn-secondary btn-icon-only" onclick="changeWeek(1)">
+                            <i data-lucide="chevron-right"></i>
+                        </button>
+                    </div>
+
+                    <div class="tennis-calendar-container">
+                        <div class="calendar-grid" id="tennis-calendar-grid">
+                            <!-- Dynamically generated calendar grid -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: COMPTABILITE -->
+            <section id="tab-comptabilite" class="tab-pane">
+                <div class="content-header">
+                    <div class="header-title">
+                        <h1>Comptabilité & Factures</h1>
+                        <p>Suivez les recettes, les dépenses, éditez des factures et analysez les bilans annuels.</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-primary" onclick="openNewTransactionModal()">
+                            <i data-lucide="plus-circle"></i> Saisir Transaction
+                        </button>
+                    </div>
+                </div>
+
+                <div class="sub-tabs">
+                    <button class="sub-tab-btn active" data-subtab="depenses-generales">Dépenses Générales</button>
+                    <button class="sub-tab-btn" data-subtab="recettes-generales">Recettes Générales</button>
+                </div>
+
+                <!-- SUBTAB: DEPENSES GENERALES -->
+                <div id="subtab-depenses-generales" class="accounting-sub-pane active">
+                    <div class="glass-panel">
+                        <div class="form-row" style="margin-bottom: 20px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <input type="text" id="search-depenses" placeholder="Rechercher une dépense..." oninput="renderGeneralExpensesList()">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <select id="filter-depenses-cat" onchange="renderGeneralExpensesList()">
+                                    <!-- Dynamic categories -->
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th data-sort-depenses="date_transaction" data-text="Date" onclick="toggleSort('depenses', 'date_transaction')" style="cursor: pointer; user-select: none;">Date</th>
+                                        <th data-sort-depenses="categorie_id" data-text="Catégorie" onclick="toggleSort('depenses', 'categorie_id')" style="cursor: pointer; user-select: none;">Catégorie</th>
+                                        <th data-sort-depenses="description" data-text="Description" onclick="toggleSort('depenses', 'description')" style="cursor: pointer; user-select: none;">Description</th>
+                                        <th data-sort-depenses="montant" data-text="Montant" onclick="toggleSort('depenses', 'montant')" style="cursor: pointer; user-select: none;">Montant</th>
+                                        <th data-sort-depenses="paye" data-text="Statut" onclick="toggleSort('depenses', 'paye')" style="cursor: pointer; user-select: none;">Statut</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="depenses-table-body">
+                                    <!-- Dynamic general expenses -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUBTAB: RECETTES GENERALES -->
+                <div id="subtab-recettes-generales" class="accounting-sub-pane">
+                    <div class="glass-panel">
+                        <div class="form-row" style="margin-bottom: 20px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <input type="text" id="search-recettes" placeholder="Rechercher une recette..." oninput="renderGeneralReceiptsList()">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <select id="filter-recettes-cat" onchange="renderGeneralReceiptsList()">
+                                    <!-- Dynamic categories -->
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th data-sort-recettes="date_transaction" data-text="Date" onclick="toggleSort('recettes', 'date_transaction')" style="cursor: pointer; user-select: none;">Date</th>
+                                        <th data-sort-recettes="categorie_id" data-text="Catégorie" onclick="toggleSort('recettes', 'categorie_id')" style="cursor: pointer; user-select: none;">Catégorie</th>
+                                        <th data-sort-recettes="description" data-text="Description" onclick="toggleSort('recettes', 'description')" style="cursor: pointer; user-select: none;">Description</th>
+                                        <th data-sort-recettes="montant" data-text="Montant" onclick="toggleSort('recettes', 'montant')" style="cursor: pointer; user-select: none;">Montant</th>
+                                        <th data-sort-recettes="paye" data-text="Statut" onclick="toggleSort('recettes', 'paye')" style="cursor: pointer; user-select: none;">Statut</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recettes-table-body">
+                                    <!-- Dynamic general receipts -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: BILAN -->
+            <section id="tab-bilan" class="tab-pane">
+                <div class="content-header">
+                    <div class="header-title">
+                        <h1>Bilan Financier Annuel</h1>
+                        <p>Analysez les recettes, les dépenses et la rentabilité globale de l'exercice.</p>
+                    </div>
+                </div>
+
+                <div class="dashboard-metrics" style="margin-bottom: 24px;">
+                    <div class="glass-panel metric-card success">
+                        <div class="metric-info">
+                            <h3>Total Recettes</h3>
+                            <div class="metric-value" id="bilan-total-recettes">0.00 €</div>
+                        </div>
+                        <div class="metric-icon"><i data-lucide="arrow-down-left"></i></div>
+                    </div>
+                    <div class="glass-panel metric-card danger">
+                        <div class="metric-info">
+                            <h3>Total Dépenses</h3>
+                            <div class="metric-value" id="bilan-total-depenses">0.00 €</div>
+                        </div>
+                        <div class="metric-icon"><i data-lucide="arrow-up-right"></i></div>
+                    </div>
+                    <div class="glass-panel metric-card primary">
+                        <div class="metric-info">
+                            <h3>Bilan Net</h3>
+                            <div class="metric-value" id="bilan-net">0.00 €</div>
+                        </div>
+                        <div class="metric-icon"><i data-lucide="scale"></i></div>
+                    </div>
+                </div>
+
+                <div class="dashboard-sections">
+                    <div class="glass-panel">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                            <h2 style="margin-bottom: 0;">Recettes par Catégorie</h2>
+                            <span id="bilan-recettes-header-total" style="font-weight: 700; color: var(--secondary); font-size: 1.25rem;">0.00 €</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Catégorie</th>
+                                        <th style="text-align: right;">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bilan-recettes-categories">
+                                    <!-- Dynamic categories breakdown -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="glass-panel">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                            <h2 style="margin-bottom: 0;">Dépenses par Catégorie</h2>
+                            <span id="bilan-depenses-header-total" style="font-weight: 700; color: var(--danger); font-size: 1.25rem;">0.00 €</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Catégorie</th>
+                                        <th style="text-align: right;">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bilan-depenses-categories">
+                                    <!-- Dynamic categories breakdown -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-panel" style="margin-top: 24px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h2 style="margin-bottom: 0;">Récapitulatif par Manifestation</h2>
+                        <span id="bilan-manifestations-header-total" style="font-weight: 700; font-size: 1.25rem;">0.00 €</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Manifestation</th>
+                                    <th>Date</th>
+                                    <th>Recettes</th>
+                                    <th>Dépenses</th>
+                                    <th>Bilan Net</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bilan-manifestations-summary">
+                                <!-- Dynamic manifestations breakdown -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: MANIFESTATIONS -->
+            <section id="tab-manifestations" class="tab-pane">
+                <div class="content-header">
+                    <div class="header-title">
+                        <h1>Manifestations & Événements</h1>
+                        <p>Créez des événements et suivez le budget et la rentabilité analytique de chacun d'eux.</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-primary" onclick="openModal('modal-manifestation')">
+                            <i data-lucide="plus"></i> Créer Manifestation
+                        </button>
+                    </div>
+                </div>
+
+                <div class="glass-panel" style="margin-bottom: 24px;">
+                    <h2>Liste des Événements</h2>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th data-sort-manifestations="nom" data-text="Nom" onclick="toggleSort('manifestations', 'nom')" style="cursor: pointer; user-select: none;">Nom</th>
+                                    <th data-sort-manifestations="date_debut" data-text="Date Début" onclick="toggleSort('manifestations', 'date_debut')" style="cursor: pointer; user-select: none;">Date Début</th>
+                                    <th data-sort-manifestations="date_fin" data-text="Date Fin" onclick="toggleSort('manifestations', 'date_fin')" style="cursor: pointer; user-select: none;">Date Fin</th>
+                                    <th data-sort-manifestations="lieu" data-text="Lieu" onclick="toggleSort('manifestations', 'lieu')" style="cursor: pointer; user-select: none;">Lieu</th>
+                                    <th data-sort-manifestations="recettes" data-text="Recettes" onclick="toggleSort('manifestations', 'recettes')" style="cursor: pointer; user-select: none;">Recettes</th>
+                                    <th data-sort-manifestations="depenses" data-text="Dépenses" onclick="toggleSort('manifestations', 'depenses')" style="cursor: pointer; user-select: none;">Dépenses</th>
+                                    <th data-sort-manifestations="bilan" data-text="Bilan" onclick="toggleSort('manifestations', 'bilan')" style="cursor: pointer; user-select: none;">Bilan</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="manifestations-table-body">
+                                <!-- Dynamic events list -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="manifestation-details-panel" class="glass-panel" style="display: none;">
+                    <div class="chart-header">
+                        <h2 id="manifestation-details-title">Bilan détaillé : ...</h2>
+                        <button class="btn btn-secondary btn-icon-only" onclick="document.getElementById('manifestation-details-panel').style.display='none'">
+                            <i data-lucide="x"></i> Fermer
+                        </button>
+                    </div>
+                    
+                    <!-- NORMAL MANIFESTATION DETAIL VIEW -->
+                    <div id="normal-manif-details-layout">
+                        <div class="dashboard-sections">
+                            <div>
+                                <h3>Recettes par catégorie</h3>
+                                <div class="table-responsive">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Catégorie</th>
+                                                <th>Montant</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="manif-recettes-breakdown">
+                                            <!-- Dynamic breakdown -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div>
+                                <h3>Dépenses par catégorie</h3>
+                                <div class="table-responsive">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Catégorie</th>
+                                                <th>Montant</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="manif-depenses-breakdown">
+                                            <!-- Dynamic breakdown -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SPECIAL MANIFESTATION (FETE RURALE) DETAIL VIEW -->
+                    <div id="special-manif-details-layout" style="display: none;">
+                        <div class="sub-tabs" style="margin-top: 16px;">
+                            <button class="sub-tab-btn active" data-subtab="manif-dashboard">Tableau de bord</button>
+                            <button class="sub-tab-btn" data-subtab="fete-stands">Stands & Recettes</button>
+                            <button class="sub-tab-btn" data-subtab="fete-depenses">Dépenses de la Fête</button>
+                            <button class="sub-tab-btn" data-subtab="fete-partners">Partenaires (Sponsors)</button>
+                        </div>
+
+                        <!-- SUBTAB: DASHBOARD -->
+                        <div id="subtab-manif-dashboard" class="accounting-sub-pane active">
+                            <!-- Cards Recap -->
+                            <div class="dashboard-metrics" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 24px;">
+                                <div class="glass-panel metric-card success" style="padding: 16px 20px;">
+                                    <div class="metric-info">
+                                        <h3>Recettes Totales</h3>
+                                        <div class="metric-value" id="manif-dash-total-recettes" style="font-size: 1.8rem;">0.00 €</div>
+                                    </div>
+                                    <div class="metric-icon"><i data-lucide="trending-up"></i></div>
+                                </div>
+                                <div class="glass-panel metric-card danger" style="padding: 16px 20px;">
+                                    <div class="metric-info">
+                                        <h3>Dépenses Totales</h3>
+                                        <div class="metric-value" id="manif-dash-total-depenses" style="font-size: 1.8rem;">0.00 €</div>
+                                    </div>
+                                    <div class="metric-icon"><i data-lucide="trending-down"></i></div>
+                                </div>
+                                <div class="glass-panel metric-card primary" style="padding: 16px 20px;">
+                                    <div class="metric-info">
+                                        <h3>Bilan Net (Bénéfice)</h3>
+                                        <div class="metric-value" id="manif-dash-total-bilan" style="font-size: 1.8rem;">0.00 €</div>
+                                    </div>
+                                    <div class="metric-icon"><i data-lucide="wallet"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-sections" style="grid-template-columns: 1fr 1fr 1fr; gap: 24px;">
+                                <div class="glass-panel" style="padding: 20px;">
+                                    <h3 style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                                        <i data-lucide="arrow-down-left" style="color: var(--secondary);"></i> Répartition des Recettes
+                                    </h3>
+                                    <div class="table-responsive">
+                                        <table>
+                                            <thead>
+                                                <tr>
+                                                    <th>Source</th>
+                                                    <th style="text-align: right;">Montant</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="manif-dash-recettes-breakdown">
+                                                <!-- Dynamic list -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <div class="glass-panel" style="padding: 20px;">
+                                    <h3 style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                                        <i data-lucide="arrow-up-right" style="color: var(--danger);"></i> Répartition des Dépenses
+                                    </h3>
+                                    <div class="table-responsive">
+                                        <table>
+                                            <thead>
+                                                <tr>
+                                                    <th>Catégorie</th>
+                                                    <th style="text-align: right;">Montant</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="manif-dash-depenses-breakdown">
+                                                <!-- Dynamic list -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <div class="glass-panel" style="padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                                    <h3 style="margin-bottom: 16px; align-self: flex-start; display: flex; align-items: center; gap: 8px;">
+                                        <i data-lucide="pie-chart" style="color: var(--primary);"></i> Graphique des Dépenses
+                                    </h3>
+                                    <div style="width: 100%; max-width: 220px; height: 220px; position: relative; display: flex; align-items: center; justify-content: center;">
+                                        <canvas id="manif-dash-expenses-chart"></canvas>
+                                        <div id="manif-dash-expenses-chart-empty" style="display: none; position: absolute; color: var(--text-muted); font-size: 0.9rem; text-align: center;">
+                                            Aucune dépense
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SUBTAB: STANDS -->
+                        <div id="subtab-fete-stands" class="accounting-sub-pane">
+                            <!-- Cards Recap -->
+                            <div class="dashboard-metrics" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 24px;">
+                                <div class="glass-panel metric-card success" style="padding: 16px 20px;">
+                                    <div class="metric-info">
+                                        <h3>Total Recettes Stands</h3>
+                                        <div class="metric-value" id="fete-stands-total-recettes" style="font-size: 1.8rem;">0.00 €</div>
+                                    </div>
+                                    <div class="metric-icon"><i data-lucide="trending-up"></i></div>
+                                </div>
+                                <div class="glass-panel metric-card warning" style="padding: 16px 20px;">
+                                    <div class="metric-info">
+                                        <h3>Total Fonds de Caisse</h3>
+                                        <div class="metric-value" id="fete-stands-total-fonds" style="font-size: 1.8rem;">0.00 €</div>
+                                    </div>
+                                    <div class="metric-icon"><i data-lucide="coins"></i></div>
+                                </div>
+                                <div class="glass-panel metric-card primary" style="padding: 16px 20px;">
+                                    <div class="metric-info">
+                                        <h3>Bénéfice Net Global</h3>
+                                        <div class="metric-value" id="fete-stands-total-benefice" style="font-size: 1.8rem;">0.00 €</div>
+                                    </div>
+                                    <div class="metric-icon"><i data-lucide="wallet"></i></div>
+                                </div>
+                            </div>
+
+                            <div class="content-header" style="padding: 0; margin-bottom: 16px;">
+                                <h2>Liste des Stands</h2>
+                                <button class="btn btn-primary" onclick="openFeteStandModal()">
+                                    <i data-lucide="plus-circle"></i> Ajouter un Stand
+                                </button>
+                            </div>
+
+                            <!-- Stands Grid -->
+                            <div class="stands-grid" id="fete-stands-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; margin-bottom: 32px;">
+                                <!-- Dynamic Stand Cards -->
+                            </div>
+
+                            <div class="content-header" style="padding: 0; margin-bottom: 16px;">
+                                <h2>Historique des Récupérations de Caisses</h2>
+                            </div>
+
+                            <!-- Receipts Table -->
+                            <div class="glass-panel">
+                                <div class="table-responsive">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Stand de Provenance</th>
+                                                <th>Montant Récupéré</th>
+                                                <th>Commentaire / Détails</th>
+                                                <th style="width: 80px;">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="fete-receipts-table-body">
+                                            <!-- Dynamic stand receipts -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SUBTAB: EXPENSES -->
+                        <div id="subtab-fete-depenses" class="accounting-sub-pane">
+                            <div class="content-header" style="padding: 0; margin-bottom: 20px;">
+                                <div class="header-title" style="display: flex; align-items: center; gap: 16px;">
+                                    <h2>Dépenses de la Manifestation</h2>
+                                    <span id="fete-expenses-total-badge" class="badge badge-danger" style="font-size: 1rem; padding: 6px 12px; font-weight: 700;">Total : 0.00 €</span>
+                                </div>
+                                <button class="btn btn-primary" onclick="openFeteExpenseModal()">
+                                    <i data-lucide="plus-circle"></i> Nouvelle Dépense
+                                </button>
+                            </div>
+
+                            <div class="glass-panel">
+                                <div class="table-responsive">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th data-sort-manifestationExpenses="date" data-text="Date" onclick="toggleSort('manifestationExpenses', 'date')" style="cursor: pointer; user-select: none;">Date</th>
+                                                <th data-sort-manifestationExpenses="description" data-text="Description" onclick="toggleSort('manifestationExpenses', 'description')" style="cursor: pointer; user-select: none;">Description</th>
+                                                <th data-sort-manifestationExpenses="categorie" data-text="Catégorie" onclick="toggleSort('manifestationExpenses', 'categorie')" style="cursor: pointer; user-select: none;">Catégorie</th>
+                                                <th data-sort-manifestationExpenses="paye_a" data-text="Payé à" onclick="toggleSort('manifestationExpenses', 'paye_a')" style="cursor: pointer; user-select: none;">Payé à</th>
+                                                <th data-sort-manifestationExpenses="montant" data-text="Montant" onclick="toggleSort('manifestationExpenses', 'montant')" style="cursor: pointer; user-select: none;">Montant</th>
+                                                <th data-sort-manifestationExpenses="moyen_payement" data-text="Moyen" onclick="toggleSort('manifestationExpenses', 'moyen_payement')" style="cursor: pointer; user-select: none;">Moyen</th>
+                                                <th data-sort-manifestationExpenses="paye" data-text="Statut" onclick="toggleSort('manifestationExpenses', 'paye')" style="cursor: pointer; user-select: none;">Statut</th>
+                                                <th>Justificatif</th>
+                                                <th style="width: 100px;">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="fete-expenses-table-body">
+                                            <!-- Dynamic fete expenses -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SUBTAB: PARTNERS -->
+                        <div id="subtab-fete-partners" class="accounting-sub-pane">
+                            <div class="content-header" style="padding: 0; margin-bottom: 20px;">
+                                <div class="header-title">
+                                    <h2>Partenaires & Sponsors de la Communication</h2>
+                                </div>
+                                <button class="btn btn-primary" onclick="openFetePartnerModal()">
+                                    <i data-lucide="plus-circle"></i> Nouveau Partenaire
+                                </button>
+                            </div>
+
+                            <!-- Partners Grid -->
+                            <div class="partners-grid" id="fete-partners-grid">
+                                <!-- Dynamic partners cards -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: RESERVE -->
+            <section id="tab-reserve" class="tab-pane">
+                <div class="content-header">
+                    <div class="header-title">
+                        <h1>Gestion des Stocks & Boissons</h1>
+                        <p>Suivez les boissons en réserve, gérez les alertes et effectuez l'état des lieux annuel.</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary" onclick="openInventoryModal()">
+                            <i data-lucide="clipboard-list"></i> Faire l'Inventaire de Fin d'Année
+                        </button>
+                        <button class="btn btn-primary" onclick="openModal('modal-produit')">
+                            <i data-lucide="plus-circle"></i> Nouveau Produit
+                        </button>
+                    </div>
+                </div>
+
+                <div class="glass-panel">
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th data-sort-produits="nom_boisson" data-text="Nom de la Boisson" onclick="toggleSort('produits', 'nom_boisson')" style="cursor: pointer; user-select: none;">Nom de la Boisson</th>
+                                    <th data-sort-produits="prix" data-text="Prix Unitaire" onclick="toggleSort('produits', 'prix')" style="cursor: pointer; user-select: none;">Prix Unitaire</th>
+                                    <th data-sort-produits="quantite_stock" data-text="Stock Actuel" onclick="toggleSort('produits', 'quantite_stock')" style="cursor: pointer; user-select: none;">Stock Actuel</th>
+                                    <th data-sort-produits="seuil_alerte" data-text="Seuil d'Alerte" onclick="toggleSort('produits', 'seuil_alerte')" style="cursor: pointer; user-select: none;">Seuil d'Alerte</th>
+                                    <th data-sort-produits="statut" data-text="Statut" onclick="toggleSort('produits', 'statut')" style="cursor: pointer; user-select: none;">Statut</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="produits-table-body">
+                                <!-- Dynamic products list -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: INVESTISSEMENTS -->
+            <section id="tab-investissements" class="tab-pane">
+                <div class="content-header">
+                    <div class="header-title">
+                        <h1>Investissements & Matériel</h1>
+                        <p>Suivez le matériel de l'association, sa valeur et l'amortissement comptable.</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-primary" onclick="openModal('modal-investissement')">
+                            <i data-lucide="plus"></i> Saisir Investissement
+                        </button>
+                    </div>
+                </div>
+
+                <div class="glass-panel">
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th data-sort-investissements="libelle" data-text="Matériel" onclick="toggleSort('investissements', 'libelle')" style="cursor: pointer; user-select: none;">Matériel</th>
+                                    <th data-sort-investissements="date_acquisition" data-text="Date d'Achat" onclick="toggleSort('investissements', 'date_acquisition')" style="cursor: pointer; user-select: none;">Date d'Achat</th>
+                                    <th data-sort-investissements="montant_achat" data-text="Montant d'Achat" onclick="toggleSort('investissements', 'montant_achat')" style="cursor: pointer; user-select: none;">Montant d'Achat</th>
+                                    <th data-sort-investissements="duree_amortissement_ans" data-text="Durée Amort." onclick="toggleSort('investissements', 'duree_amortissement_ans')" style="cursor: pointer; user-select: none;">Durée Amort.</th>
+                                    <th data-sort-investissements="valeur_residuelle" data-text="Valeur Résiduelle" onclick="toggleSort('investissements', 'valeur_residuelle')" style="cursor: pointer; user-select: none;">Valeur Résiduelle</th>
+                                    <th data-sort-investissements="etat" data-text="État" onclick="toggleSort('investissements', 'etat')" style="cursor: pointer; user-select: none;">État</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="investissements-table-body">
+                                <!-- Dynamic investments list -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: NOTES -->
+            <section id="tab-notes" class="tab-pane">
+                <div class="content-header">
+                    <div class="header-title">
+                        <h1>Notes de Réunion</h1>
+                        <p>Prenez des notes et rédigez les comptes-rendus des réunions de l'association.</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-primary" onclick="createNewNote()">
+                            <i data-lucide="plus"></i> Nouvelle Note
+                        </button>
+                    </div>
+                </div>
+
+                <div class="glass-panel notes-container">
+                    <div class="notes-sidebar" id="notes-sidebar-list">
+                        <!-- Dynamic list of notes -->
+                    </div>
+                    
+                    <div class="notes-editor" id="notes-editor-panel">
+                        <!-- Editor view or read view -->
+                        <div class="notes-view-mode" id="note-read-view">
+                            <div class="note-view-header">
+                                <h2 id="note-view-title">Sélectionnez une note</h2>
+                                <div class="note-view-meta">
+                                    <span id="note-view-date"></span>
+                                    <span id="note-view-tag"></span>
+                                </div>
+                            </div>
+                            <div class="note-view-body" id="note-view-body">
+                                Sélectionnez ou créez une note pour commencer la rédaction.
+                            </div>
+                            <div style="margin-top: 20px;" id="note-view-actions">
+                                <!-- edit/delete buttons -->
+                            </div>
+                        </div>
+
+                        <div class="notes-edit-mode" id="note-edit-view" style="display: none; flex-direction: column; gap: 16px; height: 100%;">
+                            <input type="hidden" id="edit-note-id">
+                            <div class="form-group">
+                                <label for="edit-note-title">Titre de la Réunion</label>
+                                <input type="text" id="edit-note-title" placeholder="Ex: Réunion de préparation du Loto">
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="edit-note-date">Date de Réunion</label>
+                                    <input type="date" id="edit-note-date">
+                                </div>
+                                <div class="form-group">
+                                    <label for="edit-note-manif">Manifestation Concernée</label>
+                                    <select id="edit-note-manif">
+                                        <!-- dynamic option list -->
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group" style="flex-grow: 1; display: flex; flex-direction: column;">
+                                <label for="edit-note-content">Contenu du Compte-rendu</label>
+                                <textarea id="edit-note-content" style="flex-grow: 1; min-height: 250px; resize: vertical;" placeholder="Saisissez le compte-rendu..."></textarea>
+                            </div>
+                            <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                                <button class="btn btn-secondary" onclick="cancelNoteEdit()">Annuler</button>
+                                <button class="btn btn-success" onclick="saveNote()">Enregistrer</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: SETTINGS -->
+            <section id="tab-settings" class="tab-pane">
+                <div class="content-header">
+                    <div class="header-title">
+                        <h1>Paramètres & Configuration Firebase</h1>
+                        <p>Gérez les sauvegardes locales ou configurez la synchronisation Cloud avec Firebase.</p>
+                    </div>
+                </div>
+
+                <div class="dashboard-sections">
+                    <!-- Backup Panel -->
+                    <div class="glass-panel">
+                        <h2>Sauvegarde des Données (Local)</h2>
+                        <p style="color: var(--text-muted); margin: 12px 0 20px 0; font-size: 0.9rem; line-height: 1.5;">
+                            En mode local, vos données sont enregistrées dans le cache de votre navigateur. Vous pouvez exporter vos données sous forme de fichier JSON ou importer une sauvegarde précédente.
+                        </p>
+                        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                            <button class="btn btn-secondary" onclick="exportDatabase()">
+                                <i data-lucide="download"></i> Exporter la Base (JSON)
+                            </button>
+                            <button class="btn btn-secondary" onclick="document.getElementById('import-file-input').click()">
+                                <i data-lucide="upload"></i> Importer une Sauvegarde
+                            </button>
+                            <input type="file" id="import-file-input" style="display: none;" accept=".json" onchange="importDatabase(event)">
+                            <button class="btn btn-danger" onclick="resetDatabaseWithDemo()">
+                                <i data-lucide="rotate-ccw"></i> Données Démo
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Firebase Setup Panel -->
+                    <div class="glass-panel">
+                        <h2>Configuration Firebase / Cloud</h2>
+                        <p style="color: var(--text-muted); margin: 12px 0 20px 0; font-size: 0.9rem; line-height: 1.5;">
+                            Connectez votre application à Firebase Firestore pour activer la synchronisation en temps réel et y accéder sur votre smartphone ou d'autres appareils.
+                        </p>
+                        <form id="firebase-config-form" onsubmit="saveFirebaseConfig(event)">
+                            <div class="form-group">
+                                <label for="fb-apiKey">API Key</label>
+                                <input type="text" id="fb-apiKey" required>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="fb-projectId">Project ID</label>
+                                    <input type="text" id="fb-projectId" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="fb-appId">App ID</label>
+                                    <input type="text" id="fb-appId" required>
+                                </div>
+                            </div>
+                            <div class="form-group checkbox-group" style="margin-bottom: 20px;">
+                                <input type="checkbox" id="fb-enabled">
+                                <label for="fb-enabled" style="margin-bottom: 0; cursor: pointer;">Activer la synchronisation Firebase</label>
+                            </div>
+                            <div style="display: flex; gap: 12px;">
+                                <button type="submit" class="btn btn-primary">Enregistrer Configuration</button>
+                                <button type="button" id="btn-sync-local-to-fb" class="btn btn-success" style="display: none;" onclick="migrateLocalToFirebase()">
+                                    <i data-lucide="cloud-lightning"></i> Envoyer les Données Locales vers Cloud
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Categories Editor Panel -->
+                <div class="glass-panel" style="margin-top: 24px;">
+                    <h2>Gestion des Catégories (Comptabilité & Manifestations)</h2>
+                    <p style="color: var(--text-muted); margin: 12px 0 20px 0; font-size: 0.9rem; line-height: 1.5;">
+                        Personnalisez les catégories de dépenses et de recettes de l'association. Les modifications s'appliqueront instantanément sur les formulaires de saisie et les rapports comptables.
+                    </p>
+                    
+                    <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 32px; margin-top: 20px;">
+                        <!-- List of current categories -->
+                        <div>
+                            <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Nom de la Catégorie</th>
+                                            <th>Type</th>
+                                            <th style="width: 100px;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="settings-categories-list">
+                                        <!-- Dynamic categories list -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Add/Edit form -->
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 20px; align-self: start;">
+                            <h3 id="category-form-title" style="font-size: 1.1rem; margin-bottom: 16px; font-weight: 600;">Ajouter une Catégorie</h3>
+                            <form id="form-category" onsubmit="saveCategory(event)">
+                                <input type="hidden" id="category-id">
+                                <div class="form-group">
+                                    <label for="category-libelle">Nom de la Catégorie</label>
+                                    <input type="text" id="category-libelle" placeholder="Ex: Sponsor / Mécénat" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="category-type">Type / Usage</label>
+                                    <select id="category-type" required>
+                                        <option value="Recette">Recette (Générale)</option>
+                                        <option value="Dépense">Dépense (Générale)</option>
+                                        <option value="Manifestation">Manifestation (Événement)</option>
+                                    </select>
+                                </div>
+                                <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                                    <button type="button" id="btn-cancel-category-edit" class="btn btn-secondary" style="display: none;" onclick="cancelCategoryEdit()">Annuler</button>
+                                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Membership Settings Panel -->
+                <div class="glass-panel" style="margin-top: 24px;">
+                    <h2>Paramètres des Adhésions</h2>
+                    <p style="color: var(--text-muted); margin: 12px 0 20px 0; font-size: 0.9rem; line-height: 1.5;">
+                        Configurez le montant par défaut de la cotisation annuelle pour les adhérents du Foyer Rural.
+                    </p>
+                    <div class="form-row">
+                        <div class="form-group" style="max-width: 300px;">
+                            <label for="settings-cotisation-amount">Montant de la cotisation (€)</label>
+                            <input type="number" id="settings-cotisation-amount" min="0" step="0.5" value="20.00" onchange="saveCotisationAmountSetting(this.value)" style="margin-top: 6px;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Logo Customization Panel -->
+                <div class="glass-panel" style="margin-top: 24px; margin-bottom: 24px;">
+                    <h2>Personnalisation du Logo</h2>
+                    <p style="color: var(--text-muted); margin: 12px 0 20px 0; font-size: 0.9rem; line-height: 1.5;">
+                        Personnalisez le logo de l'association affiché dans la barre latérale et en arrière-plan de l'application. Vous pouvez charger une image (Base64) et ajuster sa transparence.
+                    </p>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Image du Logo</label>
+                            <div style="display: flex; gap: 12px; align-items: center; margin-top: 6px;">
+                                <input type="file" id="logo-file-input" accept="image/*" style="display: none;" onchange="handleLogoUpload(event)" />
+                                <button type="button" class="btn btn-secondary" onclick="document.getElementById('logo-file-input').click()">
+                                    <i data-lucide="upload"></i> Choisir un fichier...
+                                </button>
+                                <span id="logo-file-name" style="font-size: 0.85rem; color: var(--text-muted); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 200px;">logo.png</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Opacité du logo en arrière-plan (<span id="logo-opacity-value">5%</span>)</label>
+                            <div style="display: flex; align-items: center; gap: 12px; margin-top: 10px;">
+                                <input type="range" id="logo-opacity-range" min="0" max="50" value="5" style="flex-grow: 1; accent-color: var(--primary);" oninput="updateLogoOpacityFromRange(this.value)" />
+                            </div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 16px;">
+                        <button type="button" class="btn btn-danger btn-sm" onclick="resetLogoSettings()">
+                            <i data-lucide="rotate-ccw"></i> Réinitialiser par défaut
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- MODAL: ADD/EDIT ADHERENT -->
+    <div id="modal-adherent" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="adherent-modal-title">Nouvel Adhérent</h2>
+                <button class="modal-close" onclick="closeModal('modal-adherent')">&times;</button>
+            </div>
+            <form id="form-adherent" onsubmit="saveAdherent(event)">
+                <input type="hidden" id="adherent-id">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="adherent-numero">Numéro d'Adhérent (Optionnel)</label>
+                        <input type="text" id="adherent-numero" placeholder="Ex: ADH-2026-0045">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="adherent-nom">Nom</label>
+                        <input type="text" id="adherent-nom" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="adherent-prenom">Prénom</label>
+                        <input type="text" id="adherent-prenom" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="adherent-email">Adresse Email</label>
+                    <input type="email" id="adherent-email" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="adherent-date">Date d'Adhésion</label>
+                        <input type="date" id="adherent-date" required>
+                    </div>
+                </div>
+                <div class="form-row" style="margin-top: 10px;">
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="adherent-cotisation">
+                        <label for="adherent-cotisation" style="margin-bottom: 0; cursor: pointer;">Cotisation à jour</label>
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="adherent-gestanet">
+                        <label for="adherent-gestanet" style="margin-bottom: 0; cursor: pointer;">Gestanet à jour</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-adherent')">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD/EDIT TRANSACTION -->
+    <div id="modal-transaction" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="transaction-modal-title">Nouvelle Transaction</h2>
+                <button class="modal-close" onclick="closeModal('modal-transaction')">&times;</button>
+            </div>
+            <form id="form-transaction" onsubmit="saveTransaction(event)">
+                <input type="hidden" id="transaction-id">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="transaction-flux">Type de Flux</label>
+                        <select id="transaction-flux" onchange="toggleTransactionDetails(); updateTransactionCategoriesDropdown();" required>
+                            <option value="Recette">Recette</option>
+                            <option value="Dépense">Dépense</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="transaction-date">Date de Transaction</label>
+                        <input type="date" id="transaction-date" required>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="transaction-categorie">Catégorie</label>
+                        <select id="transaction-categorie" required>
+                            <!-- categories dynamic options -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="transaction-moyen">Moyen de Paiement</label>
+                        <select id="transaction-moyen" required>
+                            <option value="Espèces">Espèces</option>
+                            <option value="Chèque">Chèque</option>
+                            <option value="Carte Bancaire">Carte Bancaire</option>
+                            <option value="Virement">Virement</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="transaction-prix">Prix Unitaire (€)</label>
+                        <input type="number" id="transaction-prix" step="0.01" min="0" oninput="calcTransactionMontant()" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="transaction-quantite">Quantité</label>
+                        <input type="number" id="transaction-quantite" step="1" min="1" oninput="calcTransactionMontant()" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="transaction-montant">Montant Total (€)</label>
+                        <input type="number" id="transaction-montant" step="0.01" min="0" readonly>
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="transaction-paye" checked>
+                        <label for="transaction-paye" style="margin-bottom: 0; cursor: pointer;">Réglé / Payé</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="transaction-desc">Description</label>
+                    <input type="text" id="transaction-desc" required>
+                </div>
+
+                <!-- Custom Linkages -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="transaction-adherent">Lié à l'Adhérent (Optionnel)</label>
+                        <select id="transaction-adherent">
+                            <option value="">-- Aucun --</option>
+                            <!-- adherents list -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="transaction-manifestation">Lié à la Manifestation (Optionnel)</label>
+                        <select id="transaction-manifestation" onchange="updateTransactionCategoriesDropdown()">
+                            <option value="">-- Aucun --</option>
+                            <!-- manifestations list -->
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="transaction-investissement">Lié à l'Investissement (Optionnel)</label>
+                        <select id="transaction-investissement">
+                            <option value="">-- Aucun --</option>
+                            <!-- investments list -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="transaction-produit">Produit de la Réserve vendu/acheté (Optionnel)</label>
+                        <select id="transaction-produit">
+                            <option value="">-- Aucun --</option>
+                            <!-- products list -->
+                        </select>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-transaction')">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD/EDIT MANIFESTATION -->
+    <div id="modal-manifestation" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="manifestation-modal-title">Nouvelle Manifestation</h2>
+                <button class="modal-close" onclick="closeModal('modal-manifestation')">&times;</button>
+            </div>
+            <form id="form-manifestation" onsubmit="saveManifestation(event)">
+                <input type="hidden" id="manifestation-id">
+                <div class="form-group">
+                    <label for="manifestation-nom">Nom de la Manifestation</label>
+                    <input type="text" id="manifestation-nom" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="manifestation-debut">Date de Début</label>
+                        <input type="date" id="manifestation-debut" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="manifestation-fin">Date de Fin</label>
+                        <input type="date" id="manifestation-fin" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="manifestation-lieu">Lieu</label>
+                    <input type="text" id="manifestation-lieu" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-manifestation')">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD/EDIT PRODUIT -->
+    <div id="modal-produit" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="produit-modal-title">Nouveau Produit</h2>
+                <button class="modal-close" onclick="closeModal('modal-produit')">&times;</button>
+            </div>
+            <form id="form-produit" onsubmit="saveProduit(event)">
+                <input type="hidden" id="produit-id">
+                <div class="form-group">
+                    <label for="produit-nom">Nom de la Boisson</label>
+                    <input type="text" id="produit-nom" placeholder="Ex: Coca-cola 33cl" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="produit-prix">Prix Unitaire Vente (€)</label>
+                        <input type="number" id="produit-prix" step="0.01" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="produit-stock">Stock Initial</label>
+                        <input type="number" id="produit-stock" step="1" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="produit-seuil">Seuil d'Alerte</label>
+                        <input type="number" id="produit-seuil" step="1" min="0" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-produit')">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD/EDIT INVESTISSEMENT -->
+    <div id="modal-investissement" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="investissement-modal-title">Saisir Investissement</h2>
+                <button class="modal-close" onclick="closeModal('modal-investissement')">&times;</button>
+            </div>
+            <form id="form-investissement" onsubmit="saveInvestissement(event)">
+                <input type="hidden" id="investissement-id">
+                <div class="form-group">
+                    <label for="invest-libelle">Libellé du Matériel</label>
+                    <input type="text" id="invest-libelle" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="invest-date">Date d'Acquisition</label>
+                        <input type="date" id="invest-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="invest-montant">Montant Achat (€)</label>
+                        <input type="number" id="invest-montant" step="0.01" min="0" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="invest-amort">Durée d'Amortissement (ans)</label>
+                        <input type="number" id="invest-amort" step="1" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="invest-etat">État du Matériel</label>
+                        <select id="invest-etat" required>
+                            <option value="Neuf">Neuf</option>
+                            <option value="Occasion">Occasion</option>
+                            <option value="Hors service">Hors service</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-investissement')">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: TENNIS RESERVATION CREATION -->
+    <div id="modal-tennis" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Réserver le Court de Tennis</h2>
+                <button class="modal-close" onclick="closeModal('modal-tennis')">&times;</button>
+            </div>
+            <form id="form-tennis" onsubmit="saveTennisBooking(event)">
+                <input type="hidden" id="tennis-booking-date">
+                <input type="hidden" id="tennis-booking-hour">
+                <div class="form-group">
+                    <label>Créneau sélectionné</label>
+                    <p style="font-weight: 600; font-size: 1.05rem;" id="tennis-booking-label">Lundi 8h00 - 9h00</p>
+                </div>
+                <div class="form-group">
+                    <label for="tennis-booking-adherent">Sélectionner l'Adhérent</label>
+                    <select id="tennis-booking-adherent" required>
+                        <!-- list of adherents -->
+                    </select>
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                        Seuls les adhérents ayant une cotisation à jour peuvent réserver.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-tennis')">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Réserver</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: YEAR-END INVENTORY (ÉTAT DES LIEUX BOISSONS) -->
+    <div id="modal-inventory" class="modal-overlay">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h2>État des lieux de fin d'année - Ajustement des stocks</h2>
+                <button class="modal-close" onclick="closeModal('modal-inventory')">&times;</button>
+            </div>
+            <div style="margin-bottom: 20px; font-size: 0.9rem; color: var(--text-muted); line-height: 1.5;">
+                Saisissez les quantités réelles comptées en réserve. L'application calculera les écarts (pertes ou surplus) et effectuera les transactions d'ajustement comptable correspondantes pour démarrer la nouvelle période à jour.
+            </div>
+            <form id="form-inventory" onsubmit="saveInventoryAdjustments(event)">
+                <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Boisson</th>
+                                <th>Théorique (Système)</th>
+                                <th>Réel (Constaté)</th>
+                                <th>Écart (Qté)</th>
+                                <th>Écart (Valeur)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-table-body">
+                            <!-- populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-inventory')">Annuler</button>
+                    <button type="submit" class="btn btn-success">Valider l'Inventaire & Ajuster</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: INVOICE PREVIEW & BILLING -->
+    <div id="modal-invoice" class="modal-overlay">
+        <div class="modal-content" style="max-width: 850px; background-color: #f3f4f6;">
+            <div class="modal-header" style="border-bottom: 1px solid #d1d5db;">
+                <h2 style="color: #1f2937;">Éditeur & Prévisualisation de Facture</h2>
+                <button class="modal-close" style="color: #4b5563;" onclick="closeModal('modal-invoice')">&times;</button>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <button class="btn btn-primary" onclick="window.print()">
+                    <i data-lucide="printer"></i> Imprimer / Télécharger en PDF
+                </button>
+            </div>
+            
+            <!-- Real invoice content block -->
+            <div class="invoice-container" id="invoice-modal-content">
+                <!-- Dynamically generated invoice -->
+            </div>
+            
+            <div class="modal-footer" style="border-top: 1px solid #d1d5db;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-invoice')">Fermer</button>
+                <button type="button" class="btn btn-primary" onclick="saveInvoiceEdits()">Enregistrer les modifications</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD/EDIT FETE STAND -->
+    <div id="modal-fete-stand" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="fete-stand-modal-title">Nouveau Stand</h2>
+                <button class="modal-close" onclick="closeModal('modal-fete-stand')">&times;</button>
+            </div>
+            <form id="form-fete-stand" onsubmit="saveFeteStand(event)">
+                <input type="hidden" id="fete-stand-id">
+                <div class="form-group">
+                    <label for="fete-stand-nom">Nom du Stand</label>
+                    <input type="text" id="fete-stand-nom" placeholder="Ex: Buvette, Restauration, Enveloppes" required>
+                </div>
+                <div class="form-group">
+                    <label for="fete-stand-fond">Fond de Caisse Initial (€)</label>
+                    <input type="number" id="fete-stand-fond" step="0.01" min="0" value="0.00" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-fete-stand')">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: REGISTER STAND RECEIPT -->
+    <div id="modal-fete-receipt" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Récupérer de l'argent d'un Stand</h2>
+                <button class="modal-close" onclick="closeModal('modal-fete-receipt')">&times;</button>
+            </div>
+            <form id="form-fete-receipt" onsubmit="saveFeteReceipt(event)">
+                <input type="hidden" id="fete-receipt-id">
+                <input type="hidden" id="fete-receipt-stand-id">
+                <div class="form-group">
+                    <label>Stand de provenance</label>
+                    <input type="text" id="fete-receipt-stand-nom" readonly style="opacity: 0.7;">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="fete-receipt-date">Date de relève</label>
+                        <input type="date" id="fete-receipt-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="fete-receipt-montant">Montant Récupéré (€)</label>
+                        <input type="number" id="fete-receipt-montant" step="0.01" min="0.05" placeholder="0.00" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="fete-receipt-comment">Commentaire / Détails</label>
+                    <input type="text" id="fete-receipt-comment" placeholder="Ex: Caisse après-midi, Vente tickets">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-fete-receipt')">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD/EDIT FETE EXPENSE -->
+    <div id="modal-fete-expense" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="fete-expense-modal-title">Nouvelle Dépense - Fête Rurale</h2>
+                <button class="modal-close" onclick="closeModal('modal-fete-expense')">&times;</button>
+            </div>
+            <form id="form-fete-expense" onsubmit="saveFeteExpense(event)">
+                <input type="hidden" id="fete-expense-id">
+                <div class="form-group">
+                    <label for="fete-expense-desc">Description de la dépense</label>
+                    <input type="text" id="fete-expense-desc" placeholder="Ex: Achat gobelets recyclables, Cachet Artiste" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="fete-expense-date">Date de dépense</label>
+                        <input type="date" id="fete-expense-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="fete-expense-montant">Montant TTC (€)</label>
+                        <input type="number" id="fete-expense-montant" step="0.01" min="0" placeholder="0.00" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="fete-expense-cat">Catégorie</label>
+                        <select id="fete-expense-cat" required>
+                            <option value="animation">Animation</option>
+                            <option value="buffet">Buffet</option>
+                            <option value="buvette">Buvette</option>
+                            <option value="chars">Chars / Défilé</option>
+                            <option value="décoration">Décoration</option>
+                            <option value="autre">Autre</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="fete-expense-moyen">Moyen de Paiement</label>
+                        <select id="fete-expense-moyen" required>
+                            <option value="Espèces">Espèces</option>
+                            <option value="Chèque">Chèque</option>
+                            <option value="Carte Bancaire">Carte Bancaire</option>
+                            <option value="Virement">Virement</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="fete-expense-payea">Payé à / Bénéficiaire</label>
+                        <input type="text" id="fete-expense-payea" placeholder="Ex: Grossiste Boissons, Artiste" required>
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="fete-expense-paye" checked>
+                        <label for="fete-expense-paye" style="margin-bottom: 0; cursor: pointer;">Réglé / Payé</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="fete-expense-comment">Commentaires / Notes</label>
+                    <input type="text" id="fete-expense-comment" placeholder="Ex: Facture n°1023">
+                </div>
+                <div class="form-group">
+                    <label for="fete-expense-scan">Scan du Justificatif (Facture/Ticket)</label>
+                    <input type="file" id="fete-expense-scan" accept="image/*" onchange="handleFeteFile(event, 'fete-expense-scan-data')">
+                    <input type="hidden" id="fete-expense-scan-data">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-fete-expense')">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD/EDIT FETE PARTNER -->
+    <div id="modal-fete-partner" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="fete-partner-modal-title">Nouveau Partenaire (Sponsor)</h2>
+                <button class="modal-close" onclick="closeModal('modal-fete-partner')">&times;</button>
+            </div>
+            <form id="form-fete-partner" onsubmit="saveFetePartner(event)">
+                <input type="hidden" id="fete-partner-id">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="fete-partner-entreprise">Nom de l'Entreprise</label>
+                        <input type="text" id="fete-partner-entreprise" placeholder="Ex: Boulangerie Lefèvre" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="fete-partner-contact">Nom du Contact</label>
+                        <input type="text" id="fete-partner-contact" placeholder="Ex: Jean Lefèvre" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="fete-partner-suivi">Qui les suit ? (Responsable)</label>
+                        <input type="text" id="fete-partner-suivi" placeholder="Ex: Pierre Martin" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="fete-partner-montant">Montant Sponsoring (€)</label>
+                        <input type="number" id="fete-partner-montant" step="0.01" min="0" placeholder="0.00" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="fete-partner-moyen">Moyen de Paiement</label>
+                        <select id="fete-partner-moyen" required>
+                            <option value="Virement">Virement</option>
+                            <option value="Chèque">Chèque</option>
+                            <option value="Espèces">Espèces</option>
+                            <option value="Carte Bancaire">Carte Bancaire</option>
+                        </select>
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="fete-partner-paye" checked>
+                        <label for="fete-partner-paye" style="margin-bottom: 0; cursor: pointer;">Sponsoring Reçu / Payé</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="fete-partner-logo">Logo de l'entreprise</label>
+                    <input type="file" id="fete-partner-logo" accept="image/*" onchange="handleFeteFile(event, 'fete-partner-logo-data')">
+                    <input type="hidden" id="fete-partner-logo-data">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-fete-partner')">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: IMAGE VIEWER FOR FETE SCANS & LOGOS -->
+    <div id="modal-fete-viewer" class="modal-overlay">
+        <div class="modal-content" style="max-width: 600px; text-align: center;">
+            <div class="modal-header">
+                <h2 id="fete-viewer-title">Justificatif</h2>
+                <button class="modal-close" onclick="closeModal('modal-fete-viewer')">&times;</button>
+            </div>
+            <div style="margin: 20px 0; overflow: auto; max-height: 450px; display: flex; justify-content: center; align-items: center;">
+                <img id="fete-viewer-img" src="" alt="Aperçu" style="max-width: 100%; max-height: 400px; border-radius: var(--border-radius); border: 1px solid var(--border-color);">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-fete-viewer')">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
