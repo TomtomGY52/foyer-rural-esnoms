@@ -24,9 +24,38 @@
     <!-- Firebase Compat SDKs (allows running from file:// without CORS module issues) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+    <script src="/__/firebase/init.js"></script>
 </head>
 <body>
     <div id="main-bg-watermark" style="position: fixed; top: 50%; left: calc(50% + 130px); transform: translate(-50%, -50%); width: 500px; height: 500px; background-size: contain; background-repeat: no-repeat; background-position: center; pointer-events: none; opacity: 0.05; z-index: 0;"></div>
+    <div id="login-screen" style="display: none;">
+        <div class="login-box">
+            <div class="login-header">
+                <img src="logo.png" alt="Logo" class="login-logo" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px;" id="login-logo-img">
+                <h2>Foyer Rural d'Esnoms au Val</h2>
+                <p>Espace d'Administration Sécurisé</p>
+            </div>
+            <form id="login-form" onsubmit="handleLoginSubmit(event)">
+                <div class="form-group" style="margin-bottom: 16px; text-align: left;">
+                    <label for="login-email" style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 0.9rem;">Adresse e-mail</label>
+                    <input type="email" id="login-email" required placeholder="admin@foyerrural.fr" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.95rem;">
+                </div>
+                <div class="form-group" style="margin-bottom: 20px; text-align: left;">
+                    <label for="login-password" style="display: block; margin-bottom: 6px; font-weight: 500; font-size: 0.9rem;">Mot de passe</label>
+                    <input type="password" id="login-password" required placeholder="••••••••" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.95rem;">
+                </div>
+                <div id="login-error-msg" style="display: none; color: var(--danger); font-size: 0.85rem; margin-bottom: 16px; font-weight: 500; text-align: left;">
+                    Identifiants incorrects. Veuillez réessayer.
+                </div>
+                <button type="submit" class="btn btn-primary" id="btn-login-submit" style="width: 100%; padding: 12px; font-weight: 600; font-size: 0.95rem; justify-content: center;">
+                    Se connecter
+                </button>
+            </form>
+        </div>
+    </div>
+
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
@@ -61,6 +90,9 @@
                 </ul>
             </nav>
             <div class="db-status-container">
+                <button id="btn-sidebar-logout" class="btn btn-danger btn-block" onclick="logoutUser()" style="display: none; margin-bottom: 12px; gap: 8px; justify-content: center; align-items: center; width: 100%;">
+                    <i data-lucide="log-out" style="width: 16px; height: 16px;"></i> Se déconnecter
+                </button>
                 <div class="db-status-badge">
                     <span id="db-status-dot" class="status-dot"></span>
                     <span id="db-status-text">Mode Local</span>
@@ -924,6 +956,22 @@
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+
+                <!-- Share QR Code Panel -->
+                <div class="glass-panel" style="margin-top: 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 32px; padding: 28px;">
+                    <div style="background: white; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); display: inline-block; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); flex-shrink: 0; margin: 0 auto;">
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://foyer-rural-esnoms.web.app&ecc=M" alt="QR Code Foyer Rural" style="width: 150px; height: 150px; display: block; image-rendering: pixelated;">
+                    </div>
+                    <div style="flex: 1; min-width: 250px;">
+                        <h2 style="margin-top: 0; margin-bottom: 8px;">Partager l'Application</h2>
+                        <p style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.5; margin-bottom: 16px;">
+                            Scannez ce QR Code avec votre smartphone ou tablette pour accéder instantanément à l'espace d'administration sécurisé en ligne.
+                        </p>
+                        <a href="https://foyer-rural-esnoms.web.app" target="_blank" style="font-weight: 600; color: var(--primary); text-decoration: none; word-break: break-all; font-size: 1rem; display: inline-flex; align-items: center; gap: 6px;">
+                            <i data-lucide="external-link" style="width: 18px; height: 18px;"></i> https://foyer-rural-esnoms.web.app
+                        </a>
                     </div>
                 </div>
 

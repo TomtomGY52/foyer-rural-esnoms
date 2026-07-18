@@ -112,24 +112,34 @@ document.addEventListener("DOMContentLoaded", () => {
 function initApp() {
     initPeriod();
     
-    // 1. Load configuration from localStorage to see if Firebase is configured/enabled
-    const savedConfig = localStorage.getItem("foyer_firebase_config");
-    const savedEnabled = localStorage.getItem("foyer_firebase_enabled");
-    
-    if (savedConfig) {
-        STATE.firebaseConfig = JSON.parse(savedConfig);
-        document.getElementById("fb-apiKey").value = STATE.firebaseConfig.apiKey || "";
-        document.getElementById("fb-projectId").value = STATE.firebaseConfig.projectId || "";
-        document.getElementById("fb-appId").value = STATE.firebaseConfig.appId || "";
-    }
-    
-    if (savedEnabled === "true" && STATE.firebaseConfig) {
+    // 1. Check if running on Firebase Hosting (auto-initialized by /__/firebase/init.js)
+    const isFirebaseHosted = window.location.hostname.endsWith(".web.app") || 
+                             window.location.hostname.endsWith(".firebaseapp.com") ||
+                             (window.firebase && firebase.apps.length > 0);
+
+    if (isFirebaseHosted) {
         STATE.firebaseEnabled = true;
         document.getElementById("fb-enabled").checked = true;
+    } else {
+        // Load configuration from localStorage to see if Firebase is configured/enabled locally
+        const savedConfig = localStorage.getItem("foyer_firebase_config");
+        const savedEnabled = localStorage.getItem("foyer_firebase_enabled");
+        
+        if (savedConfig) {
+            STATE.firebaseConfig = JSON.parse(savedConfig);
+            document.getElementById("fb-apiKey").value = STATE.firebaseConfig.apiKey || "";
+            document.getElementById("fb-projectId").value = STATE.firebaseConfig.projectId || "";
+            document.getElementById("fb-appId").value = STATE.firebaseConfig.appId || "";
+        }
+        
+        if (savedEnabled === "true" && STATE.firebaseConfig) {
+            STATE.firebaseEnabled = true;
+            document.getElementById("fb-enabled").checked = true;
+        }
     }
 
     // 2. Initialize database connection
-    if (STATE.firebaseEnabled && STATE.firebaseConfig) {
+    if (STATE.firebaseEnabled && (isFirebaseHosted || STATE.firebaseConfig)) {
         connectFirebase();
     } else {
         connectLocal();
@@ -251,6 +261,8 @@ function connectLocal() {
 }
 
 // --- Firebase Cloud Storage Database Mode ---
+let activeFirebaseListeners = [];
+
 function connectFirebase() {
     try {
         if (!firebase.apps.length) {
@@ -260,50 +272,105 @@ function connectFirebase() {
         dbMode = 'firebase';
         updateDbStatusBadge();
         
-        // Listen to collections in real time
-        const collections = [
-            'adherents', 'transactions', 'categories', 'manifestations', 
-            'investissements', 'produits', 'reservations', 'notes',
-            'feteRuraleStands', 'feteRuraleReceipts', 'feteRuraleExpenses', 'feteRuralePartners'
-        ];
-        let pendingLoadCount = collections.length;
-        
-        collections.forEach(col => {
-            db.collection(col).onSnapshot(snapshot => {
-                let items = [];
-                snapshot.forEach(doc => {
-                    items.push({ id: doc.id, ...doc.data() });
-                });
-                if (col === 'feteRuraleStands' || col === 'feteRuraleReceipts' || col === 'feteRuraleExpenses' || col === 'feteRuralePartners') {
-                    items.forEach(item => {
-                        if (!item.manifestation_id) item.manifestation_id = "man-fete-rurale";
-                    });
-                }
-                if (col === 'categories') {
-                    items.forEach(c => {
-                        const def = DEFAULT_CATEGORIES.find(dc => dc.id === c.id);
-                        if (def && c.libelle !== def.libelle) {
-                            c.libelle = def.libelle;
-                            c.type = def.type;
-                        }
-                    });
-                    DEFAULT_CATEGORIES.forEach(dc => {
-                        if (!items.some(c => c.id === dc.id)) {
-                            db.collection("categories").doc(dc.id).set(dc).catch(() => {});
-                        }
-                    });
-                }
-                STATE[col] = items;
+        // Listen to Auth State Changes
+        firebase.auth().onAuthStateChanged(user => {
+            // Unsubscribe all active listeners before creating new ones
+            activeFirebaseListeners.forEach(unsub => unsub());
+            activeFirebaseListeners = [];
+            
+            if (user) {
+                // User is signed in
+                document.getElementById("login-screen").style.display = "none";
+                const logoutBtn = document.getElementById("btn-sidebar-logout");
+                if (logoutBtn) logoutBtn.style.display = "flex";
                 
-                pendingLoadCount--;
-                if (pendingLoadCount <= 0 || true) { // Refresh layout iteratively as data arrives
-                    refreshAllViews();
-                }
-            }, error => {
-                console.error(`Firebase listen error on ${col}:`, error);
-                alert(`Erreur Firebase sur la collection ${col}. Retour au mode local.`);
-                connectLocal();
-            });
+                const appContainer = document.querySelector(".app-container");
+                if (appContainer) appContainer.style.display = "flex";
+                
+                // 1. Listen to settings collection to synchronize configurations
+                const settingsUnsub = db.collection("settings").doc("app").onSnapshot(doc => {
+                    if (doc.exists) {
+                        const data = doc.data();
+                        if (data.foyer_logo_url !== undefined) {
+                            localStorage.setItem("foyer_logo_url", data.foyer_logo_url);
+                        }
+                        if (data.foyer_logo_opacity !== undefined) {
+                            localStorage.setItem("foyer_logo_opacity", data.foyer_logo_opacity);
+                        }
+                        if (data.foyer_cotisation_amount !== undefined) {
+                            localStorage.setItem("foyer_cotisation_amount", data.foyer_cotisation_amount);
+                        }
+                        
+                        // Refresh logo in UI
+                        const logoUrl = localStorage.getItem("foyer_logo_url") || "logo.png";
+                        const opacity = localStorage.getItem("foyer_logo_opacity") !== null ? 
+                            Number(localStorage.getItem("foyer_logo_opacity")) : 0.05;
+                        renderLogo(logoUrl, opacity);
+                        updateLogoControls(logoUrl, opacity);
+                        
+                        const cotInput = document.getElementById("settings-cotisation-amount");
+                        if (cotInput) {
+                            cotInput.value = getCotisationAmount();
+                        }
+                    }
+                }, err => {
+                    console.warn("Settings fetch failed (likely initial setup):", err);
+                });
+                activeFirebaseListeners.push(settingsUnsub);
+                
+                // 2. Listen to data collections in real time
+                const collections = [
+                    'adherents', 'transactions', 'categories', 'manifestations', 
+                    'investissements', 'produits', 'reservations', 'notes',
+                    'feteRuraleStands', 'feteRuraleReceipts', 'feteRuraleExpenses', 'feteRuralePartners'
+                ];
+                
+                collections.forEach(col => {
+                    const unsub = db.collection(col).onSnapshot(snapshot => {
+                        let items = [];
+                        snapshot.forEach(doc => {
+                            items.push({ id: doc.id, ...doc.data() });
+                        });
+                        if (col === 'feteRuraleStands' || col === 'feteRuraleReceipts' || col === 'feteRuraleExpenses' || col === 'feteRuralePartners') {
+                            items.forEach(item => {
+                                if (!item.manifestation_id) item.manifestation_id = "man-fete-rurale";
+                            });
+                        }
+                        if (col === 'categories') {
+                            items.forEach(c => {
+                                const def = DEFAULT_CATEGORIES.find(dc => dc.id === c.id);
+                                if (def && c.libelle !== def.libelle) {
+                                    c.libelle = def.libelle;
+                                    c.type = def.type;
+                                }
+                            });
+                            DEFAULT_CATEGORIES.forEach(dc => {
+                                if (!items.some(c => c.id === dc.id)) {
+                                    db.collection("categories").doc(dc.id).set(dc).catch(() => {});
+                                }
+                            });
+                        }
+                        STATE[col] = items;
+                        refreshAllViews();
+                    }, error => {
+                        console.error(`Firebase listen error on ${col}:`, error);
+                    });
+                    activeFirebaseListeners.push(unsub);
+                });
+                
+            } else {
+                // User is signed out: display login, hide main app
+                document.getElementById("login-screen").style.display = "flex";
+                const logoutBtn = document.getElementById("btn-sidebar-logout");
+                if (logoutBtn) logoutBtn.style.display = "none";
+                
+                const appContainer = document.querySelector(".app-container");
+                if (appContainer) appContainer.style.display = "none";
+                
+                const logoUrl = localStorage.getItem("foyer_logo_url") || "logo.png";
+                const loginLogoImg = document.getElementById("login-logo-img");
+                if (loginLogoImg) loginLogoImg.src = logoUrl;
+            }
         });
         
     } catch (e) {
@@ -313,6 +380,58 @@ function connectFirebase() {
         localStorage.setItem("foyer_firebase_enabled", "false");
         document.getElementById("fb-enabled").checked = false;
         connectLocal();
+    }
+}
+
+function handleLoginSubmit(e) {
+    e.preventDefault();
+    const email = document.getElementById("login-email").value.trim();
+    const password = document.getElementById("login-password").value;
+    const errorMsg = document.getElementById("login-error-msg");
+    const submitBtn = document.getElementById("btn-login-submit");
+    
+    if (errorMsg) errorMsg.style.display = "none";
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerText = "Connexion en cours...";
+    }
+    
+    firebase.auth().signInWithEmailAndPassword(email, password)
+        .then(() => {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerText = "Se connecter";
+            }
+            document.getElementById("login-form").reset();
+        })
+        .catch(err => {
+            console.error("Sign in failed:", err);
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerText = "Se connecter";
+            }
+            if (errorMsg) {
+                errorMsg.innerText = "Identifiants incorrects : " + err.message;
+                errorMsg.style.display = "block";
+            }
+        });
+}
+
+function logoutUser() {
+    if (confirm("Voulez-vous vraiment vous déconnecter ?")) {
+        firebase.auth().signOut()
+            .then(() => {
+                activeFirebaseListeners.forEach(unsub => unsub());
+                activeFirebaseListeners = [];
+                // Reset mode to local to allow browsing offline if needed
+                const isFirebaseHosted = window.location.hostname.endsWith(".web.app") || 
+                                         window.location.hostname.endsWith(".firebaseapp.com");
+                if (!isFirebaseHosted) {
+                    dbMode = 'local';
+                    updateDbStatusBadge();
+                }
+            })
+            .catch(err => alert("Erreur lors de la déconnexion : " + err.message));
     }
 }
 
@@ -3511,11 +3630,39 @@ function handleFeteFile(event, hiddenInputId) {
         return;
     }
 
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        document.getElementById(hiddenInputId).value = e.target.result;
-    };
-    reader.readAsDataURL(file);
+    if (dbMode === 'firebase') {
+        const fileInput = event.target;
+        const fileInputLabel = fileInput.nextElementSibling;
+        const originalText = fileInputLabel ? fileInputLabel.innerText : "";
+        if (fileInputLabel) {
+            fileInputLabel.innerText = "Téléchargement en cours...";
+        }
+        
+        const storageRef = firebase.storage().ref();
+        const fileRef = storageRef.child(`uploads/${Date.now()}_${file.name}`);
+        
+        fileRef.put(file).then(snapshot => {
+            return snapshot.ref.getDownloadURL();
+        }).then(url => {
+            document.getElementById(hiddenInputId).value = url;
+            if (fileInputLabel) {
+                fileInputLabel.innerText = "Fichier prêt !";
+            }
+        }).catch(err => {
+            console.error("Storage upload failed:", err);
+            alert("Échec du téléchargement de l'image sur Firebase Storage : " + err.message);
+            if (fileInputLabel) {
+                fileInputLabel.innerText = originalText || "Choisir un fichier";
+            }
+            fileInput.value = "";
+        });
+    } else {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById(hiddenInputId).value = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
 }
 
 // Image Viewer modal trigger
@@ -4466,18 +4613,35 @@ function handleLogoUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
     
-    const reader = new FileReader();
-    reader.onload = function(evt) {
-        const dataUrl = evt.target.result;
+    if (dbMode === 'firebase') {
+        const fileName = document.getElementById("logo-file-name");
+        if (fileName) fileName.innerText = "Téléversement...";
         
-        localStorage.setItem("foyer_logo_url", dataUrl);
-        
-        const opacity = localStorage.getItem("foyer_logo_opacity") !== null ? 
-            Number(localStorage.getItem("foyer_logo_opacity")) : 0.05;
-        renderLogo(dataUrl, opacity);
-        updateLogoControls(dataUrl, opacity);
-    };
-    reader.readAsDataURL(file);
+        const storageRef = firebase.storage().ref();
+        const fileRef = storageRef.child(`logo/${Date.now()}_${file.name}`);
+        fileRef.put(file).then(snapshot => {
+            return snapshot.ref.getDownloadURL();
+        }).then(url => {
+            return db.collection("settings").doc("app").set({ foyer_logo_url: url }, { merge: true });
+        }).catch(err => {
+            console.error("Logo upload failed:", err);
+            alert("Échec du téléversement du logo : " + err.message);
+            initLogo();
+        });
+    } else {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            const dataUrl = evt.target.result;
+            
+            localStorage.setItem("foyer_logo_url", dataUrl);
+            
+            const opacity = localStorage.getItem("foyer_logo_opacity") !== null ? 
+                Number(localStorage.getItem("foyer_logo_opacity")) : 0.05;
+            renderLogo(dataUrl, opacity);
+            updateLogoControls(dataUrl, opacity);
+        };
+        reader.readAsDataURL(file);
+    }
 }
 
 function updateLogoOpacityFromRange(val) {
@@ -4489,13 +4653,30 @@ function updateLogoOpacityFromRange(val) {
     
     const opacityValue = document.getElementById("logo-opacity-value");
     if (opacityValue) opacityValue.innerText = val + "%";
+    
+    if (dbMode === 'firebase') {
+        db.collection("settings").doc("app").set({ foyer_logo_opacity: opacity }, { merge: true })
+            .catch(err => console.error("Failed to sync logo opacity:", err));
+    }
 }
 
 function resetLogoSettings() {
     localStorage.removeItem("foyer_logo_url");
     localStorage.removeItem("foyer_logo_opacity");
     
-    initLogo();
+    if (dbMode === 'firebase') {
+        db.collection("settings").doc("app").set({ 
+            foyer_logo_url: firebase.firestore.FieldValue.delete(), 
+            foyer_logo_opacity: firebase.firestore.FieldValue.delete() 
+        }, { merge: true })
+        .then(() => initLogo())
+        .catch(err => {
+            console.error("Failed to reset Cloud settings:", err);
+            initLogo();
+        });
+    } else {
+        initLogo();
+    }
 }
 
 // --- MEMBERSHIP COTISATION HELPERS ---
@@ -4505,6 +4686,11 @@ function getCotisationAmount() {
 }
 
 function saveCotisationAmountSetting(val) {
-    localStorage.setItem("foyer_cotisation_amount", Number(val) || 20.00);
+    const amount = Number(val) || 20.00;
+    localStorage.setItem("foyer_cotisation_amount", amount);
+    if (dbMode === 'firebase') {
+        db.collection("settings").doc("app").set({ foyer_cotisation_amount: amount }, { merge: true })
+            .catch(err => console.error("Failed to sync cotisation amount:", err));
+    }
 }
 
