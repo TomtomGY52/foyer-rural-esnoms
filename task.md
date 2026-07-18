@@ -13,7 +13,9 @@
 - `[x]` Implémentation du gestionnaire de connexion/déconnexion et d'écoute d'état Auth dans `app.js`
 - `[x]` Migration de `handleFeteFile` et `handleLogoUpload` pour téléverser sur Firebase Storage
 - `[x]` Implémentation de la synchronisation en temps réel des paramètres de l'application via la collection Firestore `settings`
+- `[x]` Rendre l'application pleinement responsive sur mobile et tablette (Barre de navigation hamburger, masquage par défaut, tableaux scrollables)
 - `[x]` Déploiement de l'application sur Firebase Hosting
-- `[ ]` Activation de Firestore Database & Firebase Storage dans la console par l'utilisateur
-- `[ ]` Déploiement des règles de sécurité Firestore & Storage après activation des services
+- `[x]` Activation de Firestore Database & Firebase Storage dans la console par l'utilisateur
+- `[x]` Déploiement des règles de sécurité Firestore & Storage après activation des services
+- `[x]` Ajout d'un QR code de partage dynamique dans les paramètres
 - `[ ]` Guide de configuration manuelle Firebase Auth pour l'utilisateur

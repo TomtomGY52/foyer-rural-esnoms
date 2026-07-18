@@ -150,6 +150,15 @@ function initApp() {
     setupSubNavigation();
     initLogo();
     
+    // Apply saved sidebar collapse preference on desktop
+    if (window.innerWidth > 768) {
+        const savedCollapsed = localStorage.getItem("foyer_sidebar_collapsed");
+        if (savedCollapsed === "true") {
+            const appContainer = document.querySelector(".app-container");
+            if (appContainer) appContainer.classList.add("sidebar-collapsed");
+        }
+    }
+    
     // 4. Setup tennis week navigation
     setWeekStart(new Date());
     
@@ -174,24 +183,10 @@ function connectLocal() {
             patched = true;
         } else {
             STATE.categories.forEach(c => {
-                const def = DEFAULT_CATEGORIES.find(dc => dc.id === c.id);
-                if (def && c.libelle !== def.libelle) {
-                    c.libelle = def.libelle;
-                    c.type = def.type;
-                    patched = true;
-                }
                 if (!c.type) {
                     const def2 = DEFAULT_CATEGORIES.find(dc => dc.libelle.toLowerCase() === c.libelle.toLowerCase()) || 
                                  DEFAULT_CATEGORIES.find(dc => dc.id === c.id);
                     c.type = def2 ? def2.type : "Recette";
-                    patched = true;
-                }
-            });
-            
-            // Add missing default categories
-            DEFAULT_CATEGORIES.forEach(dc => {
-                if (!STATE.categories.some(c => c.id === dc.id)) {
-                    STATE.categories.push(dc);
                     patched = true;
                 }
             });
@@ -337,18 +332,11 @@ function connectFirebase() {
                             });
                         }
                         if (col === 'categories') {
-                            items.forEach(c => {
-                                const def = DEFAULT_CATEGORIES.find(dc => dc.id === c.id);
-                                if (def && c.libelle !== def.libelle) {
-                                    c.libelle = def.libelle;
-                                    c.type = def.type;
-                                }
-                            });
-                            DEFAULT_CATEGORIES.forEach(dc => {
-                                if (!items.some(c => c.id === dc.id)) {
+                            if (items.length === 0) {
+                                DEFAULT_CATEGORIES.forEach(dc => {
                                     db.collection("categories").doc(dc.id).set(dc).catch(() => {});
-                                }
-                            });
+                                });
+                            }
                         }
                         STATE[col] = items;
                         refreshAllViews();
@@ -647,14 +635,24 @@ function setupNavigation() {
 }
 
 function toggleSidebarMenu() {
-    const sidebar = document.querySelector(".sidebar");
-    const backdrop = document.getElementById("sidebar-backdrop");
+    const width = window.innerWidth;
     
-    if (sidebar) {
-        sidebar.classList.toggle("open");
-        const isOpen = sidebar.classList.contains("open");
-        if (backdrop) {
-            backdrop.style.display = isOpen ? "block" : "none";
+    if (width <= 768) {
+        // Mobile layout: slide in/out fixed drawer
+        const sidebar = document.querySelector(".sidebar");
+        const backdrop = document.getElementById("sidebar-backdrop");
+        if (sidebar) {
+            sidebar.classList.toggle("open");
+            const isOpen = sidebar.classList.contains("open");
+            if (backdrop) backdrop.style.display = isOpen ? "block" : "none";
+        }
+    } else {
+        // Desktop layout: collapse/expand sidebar
+        const appContainer = document.querySelector(".app-container");
+        if (appContainer) {
+            appContainer.classList.toggle("sidebar-collapsed");
+            const isCollapsed = appContainer.classList.contains("sidebar-collapsed");
+            localStorage.setItem("foyer_sidebar_collapsed", isCollapsed ? "true" : "false");
         }
     }
 }
@@ -3386,7 +3384,7 @@ function renderSettingsCategoriesList() {
                         <button class="btn btn-secondary btn-icon-only" onclick="editCategory('${c.id}')" title="Modifier">
                             <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i>
                         </button>
-                        <button class="btn btn-secondary btn-icon-only" style="color: var(--danger);" onclick="deleteCategory('${c.id}')" title="Supprimer" ${isDefault ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''}>
+                        <button class="btn btn-secondary btn-icon-only" style="color: var(--danger);" onclick="deleteCategory('${c.id}')" title="Supprimer">
                             <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
                         </button>
                     </div>
@@ -3455,11 +3453,6 @@ function saveCategory(e) {
 }
 
 function deleteCategory(id) {
-    const isDefault = DEFAULT_CATEGORIES.some(dc => dc.id === id);
-    if (isDefault) {
-        alert("Les catégories système ne peuvent pas être supprimées car elles sont nécessaires au bon fonctionnement de l'application.");
-        return;
-    }
     
     const inUseCount = STATE.transactions.filter(t => t.categorie_id === id).length;
     if (inUseCount > 0) {

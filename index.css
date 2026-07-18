@@ -84,6 +84,7 @@ body {
     z-index: 10;
     height: 100vh;
     overflow-y: auto;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s ease, opacity 0.2s ease;
 }
 
 .logo-container {
@@ -356,6 +357,29 @@ body {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 24px;
+}
+
+/* Desktop Collapse Layout */
+.desktop-only-toggle {
+    display: flex !important;
+}
+@media (max-width: 768px) {
+    .desktop-only-toggle {
+        display: none !important;
+    }
+}
+.app-container.sidebar-collapsed .sidebar {
+    width: 0;
+    padding: 0;
+    opacity: 0;
+    border-right: none;
+    pointer-events: none;
+}
+@media (min-width: 769px) {
+    .content-header {
+        padding-left: 54px;
+        transition: padding-left 0.3s ease;
+    }
 }
 
 @media (max-width: 768px) {

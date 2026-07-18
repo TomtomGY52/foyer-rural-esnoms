@@ -117,7 +117,11 @@
         </aside>
 
         <!-- Main Content Area -->
-        <main class="main-content">
+        <main class="main-content" style="position: relative;">
+            <!-- Sidebar Collapse/Expand Toggle Button (visible on desktop and tablet) -->
+            <button id="btn-sidebar-toggle-desktop" class="btn btn-secondary btn-icon-only desktop-only-toggle" onclick="toggleSidebarMenu()" style="position: absolute; top: 24px; left: 24px; z-index: 90; height: 38px; width: 38px; display: flex; align-items: center; justify-content: center; box-shadow: var(--box-shadow); border: 1px solid var(--border-color); background: var(--bg-surface); padding: 6px; border-radius: 6px;" title="Afficher/Masquer la barre latérale">
+                <i data-lucide="menu" style="width: 20px; height: 20px;"></i>
+            </button>
             
             <!-- TAB: DASHBOARD -->
             <section id="tab-dashboard" class="tab-pane active">
