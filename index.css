@@ -369,17 +369,18 @@ body {
     }
 }
 .app-container.sidebar-collapsed .sidebar {
-    width: 0;
-    padding: 0;
-    opacity: 0;
-    border-right: none;
-    pointer-events: none;
+    width: 72px;
+    padding: 24px 16px;
 }
-@media (min-width: 769px) {
-    .content-header {
-        padding-left: 54px;
-        transition: padding-left 0.3s ease;
-    }
+.app-container.sidebar-collapsed .sidebar .logo-details,
+.app-container.sidebar-collapsed .sidebar .period-selector-sidebar,
+.app-container.sidebar-collapsed .sidebar nav,
+.app-container.sidebar-collapsed .sidebar .db-status-container {
+    display: none !important;
+}
+.app-container.sidebar-collapsed .sidebar .logo-container {
+    justify-content: center !important;
+    padding: 0 !important;
 }
 
 @media (max-width: 768px) {

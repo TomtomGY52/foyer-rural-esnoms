@@ -18,4 +18,5 @@
 - `[x]` Activation de Firestore Database & Firebase Storage dans la console par l'utilisateur
 - `[x]` Déploiement des règles de sécurité Firestore & Storage après activation des services
 - `[x]` Ajout d'un QR code de partage dynamique dans les paramètres
-- `[ ]` Guide de configuration manuelle Firebase Auth pour l'utilisateur
+- `[x]` Permettre la modification et la suppression complète de toutes les catégories (y compris les catégories système) sans retour automatique des anciennes valeurs
+- `[x]` Ajout d'un bouton de masquage/affichage de la barre latérale sur ordinateur et tablette (en haut à gauche de la zone de contenu principal)

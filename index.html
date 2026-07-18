@@ -74,9 +74,15 @@
 
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
-            <div class="logo-container" style="border-bottom: none; padding-bottom: 0;">
-                <img id="sidebar-logo" src="logo.png" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
-                <span class="logo-title">Foyer Rural d'Esnoms au Val</span>
+            <div class="logo-container" style="border-bottom: none; padding-bottom: 0; display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px;">
+                <div class="logo-details" style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+                    <img id="sidebar-logo" src="logo.png" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
+                    <span class="logo-title" style="white-space: nowrap;">Foyer Rural d'Esnoms au Val</span>
+                </div>
+                <!-- Sidebar Toggle Button (Inside Sidebar Logo Container) -->
+                <button id="btn-sidebar-toggle-desktop" class="btn btn-secondary btn-icon-only desktop-only-toggle" onclick="toggleSidebarMenu()" style="padding: 6px; border-radius: 6px; height: 36px; width: 36px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border-color); background: var(--bg-surface); flex-shrink: 0;" title="Afficher/Masquer la barre latérale">
+                    <i data-lucide="menu" style="width: 18px; height: 18px;"></i>
+                </button>
             </div>
             
             <!-- Global Period Selector -->
@@ -117,11 +123,7 @@
         </aside>
 
         <!-- Main Content Area -->
-        <main class="main-content" style="position: relative;">
-            <!-- Sidebar Collapse/Expand Toggle Button (visible on desktop and tablet) -->
-            <button id="btn-sidebar-toggle-desktop" class="btn btn-secondary btn-icon-only desktop-only-toggle" onclick="toggleSidebarMenu()" style="position: absolute; top: 24px; left: 24px; z-index: 90; height: 38px; width: 38px; display: flex; align-items: center; justify-content: center; box-shadow: var(--box-shadow); border: 1px solid var(--border-color); background: var(--bg-surface); padding: 6px; border-radius: 6px;" title="Afficher/Masquer la barre latérale">
-                <i data-lucide="menu" style="width: 20px; height: 20px;"></i>
-            </button>
+        <main class="main-content">
             
             <!-- TAB: DASHBOARD -->
             <section id="tab-dashboard" class="tab-pane active">
