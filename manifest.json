@@ -2,20 +2,20 @@
   "name": "Foyer Rural Esnoms",
   "short_name": "Foyer Rural",
   "description": "Application d'administration du Foyer Rural d'Esnoms au Val",
-  "start_url": "/index.html?v=2.2",
+  "start_url": "/index.html?v=2.3",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#6366f1",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "logo.png?v=2.2",
+      "src": "logo.png?v=2.3",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "logo.png?v=2.2",
+      "src": "logo.png?v=2.3",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"

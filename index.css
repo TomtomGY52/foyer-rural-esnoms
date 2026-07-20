@@ -368,19 +368,21 @@ body {
         display: none !important;
     }
 }
-.app-container.sidebar-collapsed .sidebar {
-    width: 72px;
-    padding: 24px 16px;
-}
-.app-container.sidebar-collapsed .sidebar .logo-details,
-.app-container.sidebar-collapsed .sidebar .period-selector-sidebar,
-.app-container.sidebar-collapsed .sidebar nav,
-.app-container.sidebar-collapsed .sidebar .db-status-container {
-    display: none !important;
-}
-.app-container.sidebar-collapsed .sidebar .logo-container {
-    justify-content: center !important;
-    padding: 0 !important;
+@media (min-width: 769px) {
+    .app-container.sidebar-collapsed .sidebar {
+        width: 72px;
+        padding: 24px 16px;
+    }
+    .app-container.sidebar-collapsed .sidebar .logo-details,
+    .app-container.sidebar-collapsed .sidebar .period-selector-sidebar,
+    .app-container.sidebar-collapsed .sidebar nav,
+    .app-container.sidebar-collapsed .sidebar .db-status-container {
+        display: none !important;
+    }
+    .app-container.sidebar-collapsed .sidebar .logo-container {
+        justify-content: center !important;
+        padding: 0 !important;
+    }
 }
 
 @media (max-width: 768px) {
@@ -1341,3 +1343,58 @@ tr:hover td {
     color: var(--text-muted);
     margin-bottom: 28px;
 }
+
+/* ============================================================================
+   --- MOBILE INTERFACE & LAYOUT CORRECTIONS ---
+   ============================================================================ */
+@media (max-width: 768px) {
+    /* Reset and fix mobile sidebar drawer */
+    .sidebar {
+        position: fixed !important;
+        top: 60px !important;
+        left: -280px !important;
+        width: 280px !important;
+        height: calc(100vh - 60px) !important;
+        background-color: var(--bg-surface) !important;
+        z-index: 1000 !important;
+        box-shadow: 4px 0 12px rgba(0, 0, 0, 0.05) !important;
+        border-radius: 0 !important;
+        border-right: 1px solid var(--border-color) !important;
+        border-left: none !important;
+        border-top: none !important;
+        border-bottom: none !important;
+        margin: 0 !important;
+        padding: 20px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow-y: auto !important;
+    }
+    
+    .sidebar.open {
+        left: 0 !important;
+    }
+
+    /* Tennis week navigation overlap fix */
+    .calendar-nav {
+        gap: 8px !important;
+    }
+    .calendar-nav h2 {
+        font-size: 0.85rem !important;
+        text-align: center !important;
+        margin: 0 8px !important;
+        line-height: 1.3 !important;
+        word-break: break-word !important;
+    }
+    
+    /* Tennis grid column squeeze fix with horizontal scroll */
+    .tennis-calendar-container {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        margin-top: 15px !important;
+    }
+    
+    .calendar-grid {
+        min-width: 750px !important;
+    }
+}
+
