@@ -4682,12 +4682,6 @@ function renderFeteRurale() {
         sortedRecs.forEach(r => {
             const stand = STATE.feteRuraleStands.find(s => s.id === r.stand_id);
             const standName = stand ? stand.nom : "Stand inconnu";
-            receiptsTable.innerHTML += `
-                <tr>
-                    <td>${formatDateFrench(new Date(r.date))}</td>
-                    <td style="font-weight: 500;">${standName}</td>
-                    <td style="color: var(--secondary); font-weight: 600;">${Number(r.montant).toFixed(2)} €</td>
-                    <td>${r.comment || '<span style="color: var(--text-muted);">--</span>'}</td>
             const receiptActions = canWriteFete ? `
                         <div style="display: flex; gap: 8px;">
                             <button class="btn btn-secondary btn-icon-only btn-sm" onclick="editFeteReceipt('${r.id}')" title="Modifier">
