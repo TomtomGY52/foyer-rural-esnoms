@@ -139,7 +139,10 @@ function initApp() {
     }
 
     // 2. Initialize database connection
-    if (STATE.firebaseEnabled && (isFirebaseHosted || STATE.firebaseConfig)) {
+    if (isFirebaseHosted || (STATE.firebaseConfig && STATE.firebaseConfig.apiKey)) {
+        STATE.firebaseEnabled = true;
+        const fbCheckbox = document.getElementById("fb-enabled");
+        if (fbCheckbox) fbCheckbox.checked = true;
         connectFirebase();
     } else {
         connectLocal();
@@ -262,6 +265,15 @@ function connectFirebase() {
     try {
         if (!firebase.apps.length) {
             firebase.initializeApp(STATE.firebaseConfig);
+            // Enable offline persistence for robust mobile support
+            firebase.firestore().enablePersistence({ synchronizeTabs: true })
+                .catch(err => {
+                    if (err.code == 'failed-precondition') {
+                        console.warn("Persistence failed: multiple tabs open");
+                    } else if (err.code == 'unimplemented') {
+                        console.warn("Persistence not supported by browser");
+                    }
+                });
         }
         db = firebase.firestore();
         dbMode = 'firebase';
@@ -1700,16 +1712,17 @@ function renderBilanAnnuel() {
             const cat = STATE.categories.find(c => c.id === t.categorie_id);
             const catName = cat ? cat.libelle : "Autre";
 
-            if (t.type_flux === "Recette") {
-                recTotal += amount;
-                catRecTotals[catName] = (catRecTotals[catName] || 0) + amount;
+            if (!t.manifestation_id) {
+                // General accounting only
+                if (t.type_flux === "Recette") {
+                    recTotal += amount;
+                    catRecTotals[catName] = (catRecTotals[catName] || 0) + amount;
+                } else {
+                    depTotal += amount;
+                    catDepTotals[catName] = (catDepTotals[catName] || 0) + amount;
+                }
             } else {
-                depTotal += amount;
-                catDepTotals[catName] = (catDepTotals[catName] || 0) + amount;
-            }
-
-            // Manifestations link
-            if (t.manifestation_id) {
+                // Manifestations link
                 const manif = STATE.manifestations.find(m => m.id === t.manifestation_id);
                 if (manif) {
                     if (!manifTotals[manif.id]) {
@@ -1735,11 +1748,7 @@ function renderBilanAnnuel() {
             });
             
             if (mFondTotal > 0) {
-                // Add to overall annual expenses
-                depTotal += mFondTotal;
-                catDepTotals["Fonds de caisse (Stands)"] = (catDepTotals["Fonds de caisse (Stands)"] || 0) + mFondTotal;
-                
-                // Add to the specific manifestation totals
+                // Add to the specific manifestation totals only (not overall annual expenses)
                 if (!manifTotals[m.id]) {
                     manifTotals[m.id] = { nom: m.nom, date: m.date_debut, recettes: 0, depenses: 0 };
                 }
@@ -1751,7 +1760,18 @@ function renderBilanAnnuel() {
     // 2. Set stats widgets
     document.getElementById("bilan-total-recettes").innerText = recTotal.toFixed(2) + " €";
     document.getElementById("bilan-total-depenses").innerText = depTotal.toFixed(2) + " €";
-    const net = recTotal - depTotal;
+    
+    let totalManifNet = 0;
+    Object.keys(manifTotals).forEach(id => {
+        totalManifNet += (manifTotals[id].recettes - manifTotals[id].depenses);
+    });
+    
+    const totalManifWidget = document.getElementById("bilan-total-manif");
+    if (totalManifWidget) {
+        totalManifWidget.innerText = totalManifNet.toFixed(2) + " €";
+    }
+
+    const net = recTotal - depTotal + totalManifNet;
     const netWidget = document.getElementById("bilan-net");
     netWidget.innerText = net.toFixed(2) + " €";
     if (net >= 0) {
