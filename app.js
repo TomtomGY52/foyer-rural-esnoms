@@ -23,6 +23,7 @@ let STATE = {
     profiles: [],
     evolutionNotes: [],
     sharedEquipments: [],
+    partnerAssociations: [],
     currentUserProfile: null,
     masterAdminEmail: null,
     profilesLoaded: false,
@@ -351,7 +352,7 @@ function connectFirebase() {
                     'adherents', 'transactions', 'categories', 'manifestations', 
                     'investissements', 'produits', 'reservations', 'notes',
                     'feteRuraleStands', 'feteRuraleReceipts', 'feteRuraleExpenses', 'feteRuralePartners',
-                    'profiles', 'evolutionNotes', 'sharedEquipments'
+                    'profiles', 'evolutionNotes', 'sharedEquipments', 'partnerAssociations'
                 ];
                 
                 collections.forEach(col => {
@@ -637,6 +638,9 @@ function refreshAllViews() {
     // Refresh Evolution Notes list
     renderEvolutionNotesList();
     
+    // Refresh Partner Associations list
+    renderSettingsPartnerAssocsList();
+
     // Refresh Shared Equipments list
     renderSettingsEquipmentsList();
     
@@ -1947,7 +1951,31 @@ function renderBilanAnnuel() {
         totalManifWidget.innerText = totalManifNet.toFixed(2) + " €";
     }
 
-    const net = recTotal - depTotal + totalManifNet;
+    // Calculate total net for shared equipments (inter-association redistribution)
+    let totalEquipNet = 0;
+    (STATE.sharedEquipments || []).forEach(eq => {
+        let eqRec = 0;
+        let eqDep = 0;
+        STATE.transactions.forEach(t => {
+            if (t.equipement_id === eq.id && t.paye && isDateInPeriod(t.date_transaction, STATE.currentPeriod)) {
+                const amt = Number(t.montant) || 0;
+                if (t.type_flux === "Recette") eqRec += amt;
+                else eqDep += amt;
+            }
+        });
+        const eqNet = eqRec - eqDep;
+        (eq.partners || []).forEach(p => {
+            const pct = Number(p.pourcentage) || 0;
+            totalEquipNet += eqNet * (pct / 100);
+        });
+    });
+
+    const totalEquipWidget = document.getElementById("bilan-total-equipements");
+    if (totalEquipWidget) {
+        totalEquipWidget.innerText = totalEquipNet.toFixed(2) + " €";
+    }
+
+    const net = recTotal - depTotal + totalManifNet - totalEquipNet;
     const netWidget = document.getElementById("bilan-net");
     netWidget.innerText = net.toFixed(2) + " €";
     if (net >= 0) {
@@ -6066,6 +6094,77 @@ function showEquipmentDetailsPopover(e, eq, recTotal, depTotal, netBalance, txLi
     popover.style.top = top + "px";
 }
 
+function renderSettingsPartnerAssocsList() {
+    const listBody = document.getElementById("settings-partner-assocs-list");
+    if (!listBody) return;
+    listBody.innerHTML = "";
+
+    const assocs = STATE.partnerAssociations || [];
+    if (assocs.length === 0) {
+        listBody.innerHTML = `<tr><td colspan="2" style="text-align: center; color: var(--text-muted); padding: 20px;">Aucune association partenaire enregistrée.</td></tr>`;
+        return;
+    }
+
+    assocs.forEach(a => {
+        listBody.innerHTML += `
+            <tr>
+                <td style="font-weight: 600;">
+                    <i data-lucide="building-2" style="width: 14px; height: 14px; color: var(--primary); vertical-align: middle; margin-right: 6px;"></i>
+                    ${a.nom}
+                </td>
+                <td>
+                    <button class="btn btn-secondary btn-icon-only btn-sm" style="color: var(--danger);" onclick="deletePartnerAssociation('${a.id}')" title="Supprimer">
+                        <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function savePartnerAssociation(e) {
+    e.preventDefault();
+    const input = document.getElementById("partner-assoc-name");
+    const nom = input ? input.value.trim() : "";
+    if (!nom) return;
+
+    const newAssoc = {
+        id: "assoc-" + Date.now(),
+        nom
+    };
+
+    if (dbMode === 'firebase') {
+        db.collection("partnerAssociations").doc(newAssoc.id).set(newAssoc)
+            .then(() => {
+                input.value = "";
+                refreshAllViews();
+            })
+            .catch(err => alert("Erreur d'enregistrement : " + err.message));
+    } else {
+        if (!STATE.partnerAssociations) STATE.partnerAssociations = [];
+        STATE.partnerAssociations.push(newAssoc);
+        saveState();
+        input.value = "";
+        refreshAllViews();
+    }
+}
+
+function deletePartnerAssociation(id) {
+    if (!confirm("Voulez-vous vraiment supprimer cette association partenaire ?")) return;
+
+    if (dbMode === 'firebase') {
+        db.collection("partnerAssociations").doc(id).delete()
+            .then(() => refreshAllViews())
+            .catch(err => alert("Erreur de suppression : " + err.message));
+    } else {
+        STATE.partnerAssociations = (STATE.partnerAssociations || []).filter(a => a.id !== id);
+        saveState();
+        refreshAllViews();
+    }
+}
+
 function hideEquipmentDetailsPopover() {
     const popover = document.getElementById("equipment-popover");
     if (popover) {
@@ -6121,8 +6220,23 @@ function addEquipmentPartnerRow(name = "", percentage = 0) {
     const row = document.createElement("div");
     row.id = rowId;
     row.style.cssText = "display: flex; gap: 8px; align-items: center;";
+
+    const configuredAssocs = STATE.partnerAssociations || [];
+    let assocOptions = `<option value="">-- Sélectionner l'Association --</option>`;
+    
+    configuredAssocs.forEach(a => {
+        const isSel = (a.nom === name) ? "selected" : "";
+        assocOptions += `<option value="${a.nom}" ${isSel}>${a.nom}</option>`;
+    });
+
+    if (name && !configuredAssocs.some(a => a.nom === name)) {
+        assocOptions += `<option value="${name}" selected>${name}</option>`;
+    }
+
     row.innerHTML = `
-        <input type="text" class="form-control partner-name" placeholder="Nom association" value="${name}" required style="flex: 1;">
+        <select class="form-control partner-name" required style="flex: 1;">
+            ${assocOptions}
+        </select>
         <div style="display: flex; align-items: center; gap: 4px; width: 100px;">
             <input type="number" class="form-control partner-pct" placeholder="50" min="1" max="100" value="${percentage || ''}" required style="width: 70px;">
             <span style="font-weight: 700; color: var(--text-muted);">%</span>
