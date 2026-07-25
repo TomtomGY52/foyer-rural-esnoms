@@ -21,6 +21,7 @@ let STATE = {
     feteRuralePartners: [],
     currentPeriod: "",
     profiles: [],
+    evolutionNotes: [],
     currentUserProfile: null,
     masterAdminEmail: null,
     profilesLoaded: false,
@@ -349,7 +350,7 @@ function connectFirebase() {
                     'adherents', 'transactions', 'categories', 'manifestations', 
                     'investissements', 'produits', 'reservations', 'notes',
                     'feteRuraleStands', 'feteRuraleReceipts', 'feteRuraleExpenses', 'feteRuralePartners',
-                    'profiles'
+                    'profiles', 'evolutionNotes'
                 ];
                 
                 collections.forEach(col => {
@@ -631,6 +632,9 @@ function refreshAllViews() {
     
     // Refresh user profiles list
     renderSettingsProfilesList();
+    
+    // Refresh Evolution Notes list
+    renderEvolutionNotesList();
     
     // Apply role-based permissions to UI
     applyPermissionsToUI();
@@ -5580,5 +5584,113 @@ function deleteUserProfile(id) {
             alert("Profil supprimé de la base de données. Accès révoqué.");
         })
         .catch(err => alert("Erreur lors de la suppression : " + err.message));
+}
+
+// ============================================================================
+// --- EVOLUTION NOTES & APP IDEAS MODULE ---
+// ============================================================================
+function renderEvolutionNotesList() {
+    const list = document.getElementById("settings-evolution-notes-list");
+    if (!list) return;
+    list.innerHTML = "";
+
+    const notes = STATE.evolutionNotes || [];
+    if (notes.length === 0) {
+        list.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">Aucune note ou idée d'évolution enregistrée pour le moment.</td></tr>`;
+        return;
+    }
+
+    // Sort notes: pending first, then by creation date descending
+    const sorted = [...notes].sort((a, b) => {
+        if (a.status === 'Fait' && b.status !== 'Fait') return 1;
+        if (a.status !== 'Fait' && b.status === 'Fait') return -1;
+        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+    });
+
+    sorted.forEach(n => {
+        const isDone = n.status === "Fait";
+        const statusBadge = isDone ? 
+            `<button class="btn btn-sm" onclick="toggleEvolutionNoteStatus('${n.id}')" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); font-weight: 600; cursor: pointer;" title="Cliquer pour repasser à faire">✔️ Fait</button>` :
+            `<button class="btn btn-sm" onclick="toggleEvolutionNoteStatus('${n.id}')" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 600; cursor: pointer;" title="Cliquer pour marquer comme fait">⏳ À faire</button>`;
+
+        const textStyle = isDone ? "text-decoration: line-through; color: var(--text-muted);" : "font-weight: 500;";
+        const dateStr = n.created_at ? formatDateFrench(new Date(n.created_at)) : "--";
+
+        list.innerHTML += `
+            <tr>
+                <td>${statusBadge}</td>
+                <td><span class="badge badge-primary" style="font-size: 0.8rem;">${n.type || '💡 Idée'}</span></td>
+                <td style="${textStyle}">${n.text}</td>
+                <td style="color: var(--text-muted); font-size: 0.85rem;">${dateStr}</td>
+                <td>
+                    <button class="btn btn-secondary btn-icon-only btn-sm" style="color: var(--danger);" onclick="deleteEvolutionNote('${n.id}')" title="Supprimer">
+                        <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function saveEvolutionNote(e) {
+    e.preventDefault();
+    const textInput = document.getElementById("evolution-note-text");
+    const prioritySelect = document.getElementById("evolution-note-priority");
+
+    const text = textInput ? textInput.value.trim() : "";
+    const type = prioritySelect ? prioritySelect.value : "💡 Idée";
+
+    if (!text) return;
+
+    const newNote = {
+        id: "note-evo-" + Date.now(),
+        text,
+        type,
+        status: "À faire",
+        created_at: new Date().toISOString()
+    };
+
+    if (dbMode === 'firebase') {
+        db.collection("evolutionNotes").doc(newNote.id).set(newNote)
+            .then(() => {
+                textInput.value = "";
+            })
+            .catch(err => alert("Erreur lors de l'enregistrement : " + err.message));
+    } else {
+        if (!STATE.evolutionNotes) STATE.evolutionNotes = [];
+        STATE.evolutionNotes.push(newNote);
+        saveState();
+        textInput.value = "";
+        refreshAllViews();
+    }
+}
+
+function toggleEvolutionNoteStatus(id) {
+    const n = (STATE.evolutionNotes || []).find(item => item.id === id);
+    if (!n) return;
+
+    const newStatus = n.status === "Fait" ? "À faire" : "Fait";
+
+    if (dbMode === 'firebase') {
+        db.collection("evolutionNotes").doc(id).update({ status: newStatus });
+    } else {
+        n.status = newStatus;
+        saveState();
+        refreshAllViews();
+    }
+}
+
+function deleteEvolutionNote(id) {
+    if (!confirm("Voulez-vous vraiment supprimer cette note d'évolution ?")) return;
+
+    if (dbMode === 'firebase') {
+        db.collection("evolutionNotes").doc(id).delete();
+    } else {
+        STATE.evolutionNotes = (STATE.evolutionNotes || []).filter(item => item.id !== id);
+        saveState();
+        refreshAllViews();
+    }
 }
 
