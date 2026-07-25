@@ -2029,76 +2029,114 @@ function renderBilanAnnuel() {
         }
     }
 
-    // 7. Render Shared Equipments Bilan Summary
+    // 7. Render Shared Equipments Inter-Association Settlement Summary (Grouped by Association)
     const equipSummaryTable = document.getElementById("bilan-equipements-summary");
     const equipHeaderTotal = document.getElementById("bilan-equipements-header-total");
     if (equipSummaryTable) {
         equipSummaryTable.innerHTML = "";
         const sharedEquips = STATE.sharedEquipments || [];
-        let grandTotalEquipNet = 0;
+        
+        let associationMap = {};
 
-        if (sharedEquips.length === 0) {
-            equipSummaryTable.innerHTML = `<tr><td colspan="5" style="color: var(--text-muted); text-align: center;">Aucun équipement partagé configuré</td></tr>`;
-        } else {
-            sharedEquips.forEach(eq => {
-                let eqRec = 0;
-                let eqDep = 0;
-                let eqTxList = [];
+        sharedEquips.forEach(eq => {
+            let eqRec = 0;
+            let eqDep = 0;
+            let eqTxList = [];
 
-                STATE.transactions.forEach(t => {
-                    if (t.equipement_id === eq.id && t.paye && isDateInPeriod(t.date_transaction, STATE.currentPeriod)) {
-                        const amt = Number(t.montant) || 0;
-                        eqTxList.push(t);
-                        if (t.type_flux === "Recette") {
-                            eqRec += amt;
-                        } else {
-                            eqDep += amt;
-                        }
+            STATE.transactions.forEach(t => {
+                if (t.equipement_id === eq.id && t.paye && isDateInPeriod(t.date_transaction, STATE.currentPeriod)) {
+                    const amt = Number(t.montant) || 0;
+                    eqTxList.push(t);
+                    if (t.type_flux === "Recette") {
+                        eqRec += amt;
+                    } else {
+                        eqDep += amt;
                     }
-                });
+                }
+            });
 
-                const eqNet = eqRec - eqDep;
-                grandTotalEquipNet += eqNet;
+            const eqNet = eqRec - eqDep;
 
-                const partners = eq.partners || [];
-                let partnersHtml = "";
-                if (partners.length === 0) {
-                    partnersHtml = `<span style="color: var(--text-muted); font-size: 0.85rem;">Aucun partenaire configuré</span>`;
-                } else {
-                    partners.forEach(p => {
-                        const pct = Number(p.pourcentage) || 0;
-                        const partnerShare = eqNet * (pct / 100);
-                        if (partnerShare > 0) {
-                            partnersHtml += `<div style="margin-bottom: 2px;"><span class="badge badge-warning" style="font-size: 0.8rem; font-weight: 600;">Dû à ${p.nom} (${pct}%) : ${partnerShare.toFixed(2)} €</span></div>`;
-                        } else if (partnerShare < 0) {
-                            partnersHtml += `<div style="margin-bottom: 2px;"><span class="badge badge-success" style="font-size: 0.8rem; font-weight: 600;">À percevoir de ${p.nom} (${pct}%) : ${Math.abs(partnerShare).toFixed(2)} €</span></div>`;
-                        } else {
-                            partnersHtml += `<div style="margin-bottom: 2px;"><span class="badge" style="background: rgba(255,255,255,0.05); color: var(--text-muted); font-size: 0.8rem;">${p.nom} (${pct}%) : 0.00 €</span></div>`;
-                        }
-                    });
+            (eq.partners || []).forEach(p => {
+                const assocName = (p.nom || "").trim();
+                if (!assocName) return;
+
+                const pct = Number(p.pourcentage) || 0;
+                const pRec = eqRec * (pct / 100);
+                const pDep = eqDep * (pct / 100);
+                const pNet = eqNet * (pct / 100);
+
+                if (!associationMap[assocName]) {
+                    associationMap[assocName] = {
+                        nom: assocName,
+                        totalRec: 0,
+                        totalDep: 0,
+                        totalNet: 0,
+                        equipments: []
+                    };
                 }
 
-                const netColor = eqNet >= 0 ? "color: var(--secondary);" : "color: var(--danger);";
+                associationMap[assocName].totalRec += pRec;
+                associationMap[assocName].totalDep += pDep;
+                associationMap[assocName].totalNet += pNet;
+                associationMap[assocName].equipments.push({
+                    eqNom: eq.nom,
+                    eqDesc: eq.description,
+                    pct,
+                    eqRec,
+                    eqDep,
+                    eqNet,
+                    pRec,
+                    pDep,
+                    pNet,
+                    txList: eqTxList
+                });
+            });
+        });
+
+        const assocNames = Object.keys(associationMap);
+        let grandTotalAssocNet = 0;
+
+        if (assocNames.length === 0) {
+            equipSummaryTable.innerHTML = `<tr><td colspan="5" style="color: var(--text-muted); text-align: center;">Aucune association partenaire configurée ou transaction liée.</td></tr>`;
+        } else {
+            assocNames.forEach(name => {
+                const assoc = associationMap[name];
+                grandTotalAssocNet += assoc.totalNet;
+
+                let eqBadges = assoc.equipments.map(item => `
+                    <span class="badge badge-primary" style="margin-right: 4px; margin-bottom: 4px; font-size: 0.8rem; display: inline-block;">
+                        <i data-lucide="tent" style="width: 11px; height: 11px; vertical-align: middle; margin-right: 3px;"></i>${item.eqNom} (${item.pct}%)
+                    </span>
+                `).join("");
+
+                let statusBadge = "";
+                if (assoc.totalNet > 0) {
+                    statusBadge = `<span class="badge badge-warning" style="font-weight: 700; font-size: 0.9rem; padding: 6px 12px;">Dû à l'association : ${assoc.totalNet.toFixed(2)} €</span>`;
+                } else if (assoc.totalNet < 0) {
+                    statusBadge = `<span class="badge badge-success" style="font-weight: 700; font-size: 0.9rem; padding: 6px 12px;">À percevoir : ${Math.abs(assoc.totalNet).toFixed(2)} €</span>`;
+                } else {
+                    statusBadge = `<span class="badge" style="background: rgba(255,255,255,0.05); color: var(--text-muted); font-size: 0.85rem; padding: 6px 12px;">Solde nul : 0.00 €</span>`;
+                }
 
                 const row = document.createElement("tr");
                 row.className = "hoverable-row";
                 row.style.cursor = "pointer";
                 row.innerHTML = `
-                    <td style="font-weight: 600;">
-                        <i data-lucide="tent" style="width: 14px; height: 14px; color: var(--primary); vertical-align: middle; margin-right: 4px;"></i>
-                        ${eq.nom}
+                    <td style="font-weight: 700; font-size: 0.95rem;">
+                        <i data-lucide="building-2" style="width: 15px; height: 15px; color: var(--primary); vertical-align: middle; margin-right: 6px;"></i>
+                        ${assoc.nom}
                         <i data-lucide="info" style="width: 13px; height: 13px; color: var(--primary); opacity: 0.7; margin-left: 4px;" title="Survoler pour le détail"></i>
-                        ${eq.description ? `<div style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">${eq.description}</div>` : ''}
                     </td>
-                    <td style="color: var(--secondary); font-weight: 600;">${eqRec.toFixed(2)} €</td>
-                    <td style="color: var(--danger); font-weight: 600;">${eqDep.toFixed(2)} €</td>
-                    <td style="${netColor} font-weight: 700; font-size: 1rem;">${eqNet.toFixed(2)} €</td>
-                    <td>${partnersHtml}</td>
+                    <td>${eqBadges}</td>
+                    <td style="color: var(--secondary); font-weight: 600;">${assoc.totalRec.toFixed(2)} €</td>
+                    <td style="color: var(--danger); font-weight: 600;">${assoc.totalDep.toFixed(2)} €</td>
+                    <td>${statusBadge}</td>
                 `;
 
-                row.onmouseenter = (e) => showEquipmentDetailsPopover(e, eq, eqRec, eqDep, eqNet, eqTxList);
+                row.onmouseenter = (e) => showAssociationDetailsPopover(e, assoc);
                 row.onmouseleave = hideEquipmentDetailsPopover;
-                row.onclick = (e) => showEquipmentDetailsPopover(e, eq, eqRec, eqDep, eqNet, eqTxList);
+                row.onclick = (e) => showAssociationDetailsPopover(e, assoc);
 
                 equipSummaryTable.appendChild(row);
             });
@@ -2107,9 +2145,9 @@ function renderBilanAnnuel() {
         }
 
         if (equipHeaderTotal) {
-            equipHeaderTotal.innerText = grandTotalEquipNet.toFixed(2) + " €";
-            if (grandTotalEquipNet > 0) equipHeaderTotal.style.color = "var(--secondary)";
-            else if (grandTotalEquipNet < 0) equipHeaderTotal.style.color = "var(--danger)";
+            equipHeaderTotal.innerText = grandTotalAssocNet.toFixed(2) + " €";
+            if (grandTotalAssocNet > 0) equipHeaderTotal.style.color = "var(--warning)";
+            else if (grandTotalAssocNet < 0) equipHeaderTotal.style.color = "var(--secondary)";
             else equipHeaderTotal.style.color = "var(--text-main)";
         }
     }
@@ -5828,6 +5866,116 @@ function deleteEvolutionNote(id) {
 // ============================================================================
 // --- SHARED EQUIPMENTS (INTER-ASSOCIATIONS) MODULE ---
 // ============================================================================
+function showAssociationDetailsPopover(e, assoc) {
+    let popover = document.getElementById("equipment-popover");
+    if (!popover) {
+        popover = document.createElement("div");
+        popover.id = "equipment-popover";
+        popover.className = "category-popover";
+        document.body.appendChild(popover);
+    }
+
+    let equipsBreakdownHtml = "";
+    let allTxList = [];
+
+    (assoc.equipments || []).forEach(eqItem => {
+        const netColor = eqItem.pNet >= 0 ? "color: #f59e0b;" : "color: #10b981;";
+        const label = eqItem.pNet >= 0 ? "Dû" : "À percevoir";
+        equipsBreakdownHtml += `
+            <div style="padding: 6px 0; border-bottom: 1px dashed rgba(255,255,255,0.08); font-size: 0.85rem;">
+                <div style="display: flex; justify-content: space-between; font-weight: 600; color: var(--text-main);">
+                    <span>🎪 ${eqItem.eqNom} (Part ${eqItem.pct}%)</span>
+                    <span style="${netColor}">${label} : ${Math.abs(eqItem.pNet).toFixed(2)} €</span>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
+                    Total Équipement : Recettes ${eqItem.eqRec.toFixed(2)} € | Dépenses ${eqItem.eqDep.toFixed(2)} € (Net: ${eqItem.eqNet.toFixed(2)} €)
+                </div>
+            </div>
+        `;
+        if (eqItem.txList) {
+            eqItem.txList.forEach(t => {
+                if (!allTxList.some(x => x.id === t.id)) {
+                    allTxList.push({ ...t, eqNom: eqItem.eqNom, pct: eqItem.pct });
+                }
+            });
+        }
+    });
+
+    let txRowsHtml = "";
+    if (allTxList.length === 0) {
+        txRowsHtml = `<div style="text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 8px;">Aucune opération comptable liée.</div>`;
+    } else {
+        allTxList.forEach(t => {
+            const dateStr = formatDateFrench(new Date(t.date_transaction));
+            const isRec = t.type_flux === "Recette";
+            const amtColor = isRec ? "color: #10b981;" : "color: #ef4444;";
+            const prefix = isRec ? "+" : "-";
+            const shareAmt = Number(t.montant) * (t.pct / 100);
+
+            txRowsHtml += `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.8rem;">
+                    <div>
+                        <div style="font-weight: 500; color: var(--text-main);">${t.description}</div>
+                        <div style="font-size: 0.72rem; color: var(--text-muted);">${dateStr} • ${t.eqNom} (${t.pct}%)</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-weight: 700; ${amtColor}">
+                            ${prefix}${Number(t.montant).toFixed(2)} €
+                        </div>
+                        <div style="font-size: 0.72rem; color: var(--text-muted);">
+                            Quote-part: ${prefix}${shareAmt.toFixed(2)} €
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    const netSummaryLabel = assoc.totalNet >= 0 ? `Dû à ${assoc.nom}` : `À percevoir de ${assoc.nom}`;
+    const netSummaryColor = assoc.totalNet >= 0 ? "#f59e0b" : "#10b981";
+
+    popover.innerHTML = `
+        <div class="popover-header" style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; margin-bottom: 10px;">
+            <div style="font-weight: 700; font-size: 1rem; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                <span>🏢 ${assoc.nom}</span>
+            </div>
+            <div style="font-size: 0.85rem; color: ${netSummaryColor}; font-weight: 700; margin-top: 4px;">
+                ${netSummaryLabel} : ${Math.abs(assoc.totalNet).toFixed(2)} €
+            </div>
+        </div>
+        <div style="margin-bottom: 10px;">
+            <div style="font-weight: 600; font-size: 0.8rem; color: var(--primary); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">Détail par Équipement Partagé</div>
+            ${equipsBreakdownHtml}
+        </div>
+        <div style="font-weight: 600; font-size: 0.8rem; color: var(--primary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Transactions Concernées (${allTxList.length})</div>
+        <div style="max-height: 180px; overflow-y: auto; padding-right: 4px;">
+            ${txRowsHtml}
+        </div>
+    `;
+
+    popover.style.display = "block";
+
+    const mouseX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 200);
+    const mouseY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 200);
+
+    const popoverWidth = 340;
+    const popoverHeight = popover.offsetHeight || 280;
+
+    let left = mouseX + 15;
+    let top = mouseY - 20;
+
+    if (left + popoverWidth > window.innerWidth - 10) {
+        left = mouseX - popoverWidth - 15;
+    }
+    if (top + popoverHeight > window.innerHeight - 10) {
+        top = window.innerHeight - popoverHeight - 10;
+    }
+    if (left < 10) left = 10;
+    if (top < 10) top = 10;
+
+    popover.style.left = left + "px";
+    popover.style.top = top + "px";
+}
 function showEquipmentDetailsPopover(e, eq, recTotal, depTotal, netBalance, txList) {
     let popover = document.getElementById("equipment-popover");
     if (!popover) {
