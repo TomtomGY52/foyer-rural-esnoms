@@ -19,7 +19,12 @@ let STATE = {
     feteRuraleReceipts: [],
     feteRuraleExpenses: [],
     feteRuralePartners: [],
-    currentPeriod: ""
+    currentPeriod: "",
+    profiles: [],
+    currentUserProfile: null,
+    masterAdminEmail: null,
+    profilesLoaded: false,
+    masterAdminEmailLoaded: false
 };
 
 // Mode indicators
@@ -264,7 +269,11 @@ let activeFirebaseListeners = [];
 function connectFirebase() {
     try {
         if (!firebase.apps.length) {
-            firebase.initializeApp(STATE.firebaseConfig);
+            if (STATE.firebaseConfig) {
+                firebase.initializeApp(STATE.firebaseConfig);
+            } else {
+                firebase.initializeApp();
+            }
             // Enable offline persistence for robust mobile support
             firebase.firestore().enablePersistence({ synchronizeTabs: true })
                 .catch(err => {
@@ -301,10 +310,12 @@ function connectFirebase() {
                         if (data.master_admin_email !== undefined) {
                             STATE.masterAdminEmail = data.master_admin_email;
                         } else if (user && user.email) {
+                            STATE.masterAdminEmail = user.email.toLowerCase();
                             db.collection("settings").doc("app").set({ master_admin_email: user.email.toLowerCase() }, { merge: true })
-                                .then(() => { STATE.masterAdminEmail = user.email.toLowerCase(); })
                                 .catch(e => console.error("Error setting master_admin_email:", e));
                         }
+                        STATE.masterAdminEmailLoaded = true;
+                        refreshAllViews();
                         
                         if (data.foyer_logo_url !== undefined) {
                             localStorage.setItem("foyer_logo_url", data.foyer_logo_url);
@@ -566,19 +577,20 @@ function refreshAllViews() {
     if (dbMode === 'firebase' && firebase.auth().currentUser) {
         const userEmail = firebase.auth().currentUser.email.toLowerCase();
         
-        if (STATE.masterAdminEmail && userEmail === STATE.masterAdminEmail.toLowerCase()) {
+        // Wait until both profiles AND masterAdminEmail are loaded before deciding
+        if (!STATE.masterAdminEmailLoaded || !STATE.profilesLoaded) {
+            STATE.currentUserProfile = null; // Not yet ready, treat as admin temporarily
+        } else if (STATE.masterAdminEmail && userEmail === STATE.masterAdminEmail.toLowerCase()) {
             STATE.currentUserProfile = null; // Master admin
         } else {
             const profile = (STATE.profiles || []).find(p => p.email.toLowerCase() === userEmail);
             if (profile) {
                 STATE.currentUserProfile = profile;
-            } else if (STATE.profilesLoaded) {
-                // Profile doc is not found but profiles list is loaded: user was deleted/revoked!
+            } else {
+                // Profile doc is not found but both lists are loaded: user was deleted/revoked!
                 alert("Ce profil utilisateur a été supprimé ou n'est plus configuré. Accès révoqué.");
                 firebase.auth().signOut();
                 return;
-            } else {
-                STATE.currentUserProfile = null;
             }
         }
     } else {
@@ -5196,7 +5208,8 @@ function saveUserProfile(e) {
         submitBtn.innerText = "Création en cours...";
         
         const docId = email.toLowerCase().replace(/[^a-z0-9]/g, "_");
-        const secondaryApp = firebase.initializeApp(STATE.firebaseConfig, "SecondaryApp" + Date.now());
+        const config = STATE.firebaseConfig || (firebase.apps.length ? firebase.app().options : {});
+        const secondaryApp = firebase.initializeApp(config, "SecondaryApp" + Date.now());
         
         secondaryApp.auth().createUserWithEmailAndPassword(email, password)
             .then(() => {
@@ -5235,7 +5248,8 @@ function saveUserProfile(e) {
         submitBtn.innerText = "Mise à jour...";
         
         if (password !== existing.password) {
-            const secondaryApp = firebase.initializeApp(STATE.firebaseConfig, "SecondaryApp" + Date.now());
+            const config = STATE.firebaseConfig || (firebase.apps.length ? firebase.app().options : {});
+            const secondaryApp = firebase.initializeApp(config, "SecondaryApp" + Date.now());
             secondaryApp.auth().signInWithEmailAndPassword(email, existing.password)
                 .then(userCredential => {
                     userCredential.user.updatePassword(password)
