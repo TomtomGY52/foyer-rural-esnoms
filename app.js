@@ -753,8 +753,63 @@ function setupSubNavigation() {
 // ============================================================================
 // --- 3. MODALS MANAGER ---
 // ============================================================================
+const MODAL_TAB_MAP = {
+    'modal-adherent': 'adherents',
+    'modal-transaction': 'comptabilite',
+    'modal-manifestation': 'manifestations',
+    'modal-produit': 'reserve',
+    'modal-investissement': 'investissements',
+    'modal-tennis': 'tennis',
+    'modal-inventory': 'reserve',
+    'modal-invoice': 'comptabilite',
+    'modal-fete-stand': 'manifestations',
+    'modal-fete-receipt': 'manifestations',
+    'modal-fete-expense': 'manifestations',
+    'modal-fete-partner': 'manifestations',
+    'modal-fete-viewer': 'manifestations'
+};
+
+function applyPermissionsToModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+    
+    const tabId = MODAL_TAB_MAP[modalId];
+    if (!tabId) return;
+    
+    const canWrite = hasWritePermission(tabId);
+    
+    // Hide/show save or delete buttons inside modal
+    const actionBtns = modal.querySelectorAll("button[type='submit'], .btn-primary, .btn-danger, .btn-success, input[type='submit']");
+    actionBtns.forEach(btn => {
+        const onclick = btn.getAttribute("onclick") || "";
+        if (onclick.includes("closeModal") || onclick.includes("cancel")) return;
+        
+        if (!canWrite) {
+            btn.style.setProperty("display", "none", "important");
+        } else {
+            btn.style.removeProperty("display");
+        }
+    });
+    
+    // Disable/enable inputs, selects, textareas inside modal
+    const inputs = modal.querySelectorAll("input, select, textarea");
+    inputs.forEach(input => {
+        if (!canWrite) {
+            input.disabled = true;
+            input.readOnly = true;
+        } else {
+            input.disabled = false;
+            input.readOnly = false;
+        }
+    });
+}
+
 function openModal(id) {
-    document.getElementById(id).classList.add("active");
+    const el = document.getElementById(id);
+    if (el) {
+        el.classList.add("active");
+        applyPermissionsToModal(id);
+    }
 }
 
 function closeModal(id) {
@@ -1270,6 +1325,10 @@ function openNewAdherentModal() {
 }
 
 function toggleAdherentGestanet(id) {
+    if (!hasWritePermission("adherents")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     const a = STATE.adherents.find(item => item.id === id);
     if (!a) return;
     
@@ -1757,6 +1816,10 @@ function deleteTransaction(id) {
 }
 
 function toggleTransactionPaid(id) {
+    if (!hasWritePermission("comptabilite")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     const t = STATE.transactions.find(item => item.id === id);
     if (!t) return;
     
@@ -2713,10 +2776,14 @@ function selectNote(id) {
 
     document.getElementById("note-view-body").innerText = n.contenu;
     
-    document.getElementById("note-view-actions").innerHTML = `
-        <button class="btn btn-secondary" onclick="editNote('${n.id}')">Modifier</button>
-        <button class="btn btn-danger" onclick="deleteNote('${n.id}')">Supprimer</button>
-    `;
+    if (hasWritePermission("notes")) {
+        document.getElementById("note-view-actions").innerHTML = `
+            <button class="btn btn-secondary" onclick="editNote('${n.id}')">Modifier</button>
+            <button class="btn btn-danger" onclick="deleteNote('${n.id}')">Supprimer</button>
+        `;
+    } else {
+        document.getElementById("note-view-actions").innerHTML = "";
+    }
 
     // Ensure editor panel shows read mode
     document.getElementById("note-read-view").style.display = "flex";
@@ -3006,6 +3073,10 @@ function updateInvoiceTotalsRealTime() {
 }
 
 function saveInvoiceEdits() {
+    if (!hasWritePermission("comptabilite")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     if (!currentInvoiceTx) return;
     
     const prenomInput = document.getElementById("invoice-edit-customer-prenom");
@@ -4559,13 +4630,26 @@ function renderFeteRurale() {
             const standNet = standRec - Number(s.fond_de_caisse);
             const netColor = standNet > 0 ? "color: var(--secondary);" : (standNet < 0 ? "color: var(--danger);" : "");
             
+            const canWriteFete = hasWritePermission("manifestations");
+            const recupererBtn = canWriteFete ? `
+                        <button class="btn btn-success btn-sm" onclick="openFeteReceiptModalForStand('${s.id}')" title="Récupérer de l'argent">
+                            <i data-lucide="plus" style="width: 14px; height: 14px; margin-right: 4px;"></i> Récupérer
+                        </button>` : "";
+            const standActions = canWriteFete ? `
+                    <div class="stand-card-actions">
+                        <button class="btn btn-secondary btn-icon-only btn-sm" onclick="editFeteStand('${s.id}')" title="Modifier">
+                            <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i>
+                        </button>
+                        <button class="btn btn-secondary btn-icon-only btn-sm" style="color: var(--danger);" onclick="deleteFeteStand('${s.id}')" title="Supprimer">
+                            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                        </button>
+                    </div>` : "";
+            
             standsGrid.innerHTML += `
                 <div class="stand-card">
                     <div class="stand-card-header">
                         <div class="stand-card-title">${s.nom}</div>
-                        <button class="btn btn-success btn-sm" onclick="openFeteReceiptModalForStand('${s.id}')" title="Récupérer de l'argent">
-                            <i data-lucide="plus" style="width: 14px; height: 14px; margin-right: 4px;"></i> Récupérer
-                        </button>
+                        ${recupererBtn}
                     </div>
                     <div class="stand-card-metrics">
                         <div class="stand-metric-row">
@@ -4581,14 +4665,7 @@ function renderFeteRurale() {
                             <span class="metric-val" style="${netColor} font-weight: 600;">${standNet.toFixed(2)} €</span>
                         </div>
                     </div>
-                    <div class="stand-card-actions">
-                        <button class="btn btn-secondary btn-icon-only btn-sm" onclick="editFeteStand('${s.id}')" title="Modifier">
-                            <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i>
-                        </button>
-                        <button class="btn btn-secondary btn-icon-only btn-sm" style="color: var(--danger);" onclick="deleteFeteStand('${s.id}')" title="Supprimer">
-                            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
-                        </button>
-                    </div>
+                    ${standActions}
                 </div>
             `;
         });
@@ -4611,7 +4688,7 @@ function renderFeteRurale() {
                     <td style="font-weight: 500;">${standName}</td>
                     <td style="color: var(--secondary); font-weight: 600;">${Number(r.montant).toFixed(2)} €</td>
                     <td>${r.comment || '<span style="color: var(--text-muted);">--</span>'}</td>
-                    <td>
+            const receiptActions = canWriteFete ? `
                         <div style="display: flex; gap: 8px;">
                             <button class="btn btn-secondary btn-icon-only btn-sm" onclick="editFeteReceipt('${r.id}')" title="Modifier">
                                 <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i>
@@ -4619,7 +4696,15 @@ function renderFeteRurale() {
                             <button class="btn btn-secondary btn-icon-only btn-sm" style="color: var(--danger);" onclick="deleteFeteReceipt('${r.id}')" title="Supprimer">
                                 <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
                             </button>
-                        </div>
+                        </div>` : `<span style="color: var(--text-muted);">--</span>`;
+            receiptsTable.innerHTML += `
+                <tr>
+                    <td>${formatDateFrench(new Date(r.date))}</td>
+                    <td style="font-weight: 500;">${standName}</td>
+                    <td style="color: var(--secondary); font-weight: 600;">${Number(r.montant).toFixed(2)} €</td>
+                    <td>${r.comment || '<span style="color: var(--text-muted);">--</span>'}</td>
+                    <td>
+                        ${receiptActions}
                     </td>
                 </tr>
             `;
@@ -4673,6 +4758,15 @@ function renderFeteRurale() {
             const catObj = STATE.categories.find(c => c.id === e.categorie);
             const catLabel = catObj ? catObj.libelle : (e.categorie ? e.categorie.charAt(0).toUpperCase() + e.categorie.slice(1) : "Autre");
                 
+            const expenseActions = canWriteFete ? `
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-secondary btn-icon-only btn-sm" onclick="editFeteExpense('${e.id}')" title="Modifier">
+                                <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i>
+                            </button>
+                            <button class="btn btn-secondary btn-icon-only btn-sm" style="color: var(--danger);" onclick="deleteFeteExpense('${e.id}')" title="Supprimer">
+                                <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                            </button>
+                        </div>` : `<span style="color: var(--text-muted);">--</span>`;
             expensesTable.innerHTML += `
                 <tr>
                     <td>${formatDateFrench(new Date(e.date))}</td>
@@ -4684,14 +4778,7 @@ function renderFeteRurale() {
                     <td>${paidBadge}</td>
                     <td>${scanBtn}</td>
                     <td>
-                        <div style="display: flex; gap: 8px;">
-                            <button class="btn btn-secondary btn-icon-only btn-sm" onclick="editFeteExpense('${e.id}')" title="Modifier">
-                                <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i>
-                            </button>
-                            <button class="btn btn-secondary btn-icon-only btn-sm" style="color: var(--danger);" onclick="deleteFeteExpense('${e.id}')" title="Supprimer">
-                                <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
-                            </button>
-                        </div>
+                        ${expenseActions}
                     </td>
                 </tr>
             `;
@@ -4714,8 +4801,7 @@ function renderFeteRurale() {
                 `<img class="partner-logo-img" src="${p.logo}" onclick="openFeteImageViewer('${p.entreprise.replace(/'/g, "\\'")}', '${p.logo}')" style="cursor: pointer;" title="Agrandir le logo">` : 
                 `<div class="partner-logo-placeholder">${p.entreprise.charAt(0)}</div>`;
                 
-            partnersGrid.innerHTML += `
-                <div class="partner-card">
+            const partnerActions = canWriteFete ? `
                     <div class="partner-actions">
                         <button class="btn btn-secondary btn-icon-only btn-sm" onclick="editFetePartner('${p.id}')" title="Modifier">
                             <i data-lucide="edit-3" style="width: 12px; height: 12px;"></i>
@@ -4723,7 +4809,10 @@ function renderFeteRurale() {
                         <button class="btn btn-secondary btn-icon-only btn-sm" style="color: var(--danger);" onclick="deleteFetePartner('${p.id}')" title="Supprimer">
                             <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
                         </button>
-                    </div>
+                    </div>` : "";
+            partnersGrid.innerHTML += `
+                <div class="partner-card">
+                    ${partnerActions}
                     <div class="partner-logo-container">
                         ${logoContent}
                     </div>
@@ -5082,6 +5171,7 @@ function applyPermissionsToUI() {
                     text.includes("créer") || 
                     text.includes("importer") || 
                     text.includes("sauvegarder") ||
+                    text.includes("récupérer") ||
                     text.includes("nouveau") ||
                     text.includes("nouvel") ||
                     text.includes("nouvelle") ||
@@ -5091,10 +5181,19 @@ function applyPermissionsToUI() {
                     onclick.includes("save") || 
                     onclick.includes("reset") ||
                     onclick.includes("import") ||
-                    onclick.includes("openFete") ||
-                    onclick.includes("bookTennis") ||
-                    onclick.includes("cancelTennis") ||
-                    (el.tagName === "BUTTON" && (el.classList.contains("btn-primary") || el.classList.contains("btn-success") || el.classList.contains("btn-danger")));
+                    onclick.includes("open") ||
+                    onclick.includes("book") ||
+                    onclick.includes("cancel") ||
+                    onclick.includes("toggle") ||
+                    onclick.includes("adjust") ||
+                    onclick.includes("create") ||
+                    (el.title && (
+                        el.title.toLowerCase().includes("modifier") ||
+                        el.title.toLowerCase().includes("supprimer") ||
+                        el.title.toLowerCase().includes("ajouter") ||
+                        el.title.toLowerCase().includes("récupérer")
+                    )) ||
+                    (el.tagName === "BUTTON" && !el.classList.contains("nav-item") && !onclick.includes("toggleSort") && !onclick.includes("closeModal") && !onclick.includes("changePeriod") && !onclick.includes("changeWeek") && !onclick.includes("show") && !onclick.includes("openFeteImageViewer"));
                     
                 if (isWriteAction) {
                     if (perm === "lecture seule") {
