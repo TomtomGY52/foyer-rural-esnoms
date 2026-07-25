@@ -16,17 +16,17 @@
             errDiv.textContent += '\nError: ' + e.message + ' at ' + e.filename + ':' + e.lineno + ':' + e.colno;
         });
     </script>
-    <link rel="stylesheet" href="index.css?v=2.7">
+    <link rel="stylesheet" href="index.css?v=2.8">
     
     <!-- PWA Manifest & iOS Support -->
-    <link rel="manifest" href="manifest.json?v=2.7">
-    <link rel="apple-touch-icon" href="logo.png?v=2.7">
+    <link rel="manifest" href="manifest.json?v=2.8">
+    <link rel="apple-touch-icon" href="logo.png?v=2.8">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js?v=2.7')
+                navigator.serviceWorker.register('sw.js?v=2.8')
                     .then(reg => console.log('Service Worker registered successfully!', reg))
                     .catch(err => console.error('Service Worker registration failed:', err));
             });
@@ -48,7 +48,7 @@
     <div id="login-screen" style="display: none;">
         <div class="login-box">
             <div class="login-header">
-                <img src="logo.png?v=2.7" alt="Logo" class="login-logo" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px;" id="login-logo-img">
+                <img src="logo.png?v=2.8" alt="Logo" class="login-logo" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px;" id="login-logo-img">
                 <h2>Foyer Rural d'Esnoms au Val</h2>
                 <p>Espace d'Administration Sécurisé</p>
             </div>
@@ -78,20 +78,20 @@
                 <i data-lucide="menu" style="width: 20px; height: 20px;"></i>
             </button>
             <div style="display: flex; align-items: center; gap: 8px;">
-                <img id="mobile-header-logo" src="logo.png?v=2.7" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;" />
+                <img id="mobile-header-logo" src="logo.png?v=2.8" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;" />
                 <span style="font-weight: 700; font-size: 0.95rem; color: var(--text-main);">Foyer Rural</span>
             </div>
             <div style="width: 36px;"></div>
         </header>
-
+        
         <!-- Sidebar Backdrop for Mobile -->
         <div id="sidebar-backdrop" onclick="toggleSidebarMenu()" style="display: none;"></div>
-
+        
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
             <div class="logo-container" style="border-bottom: none; padding-bottom: 0; display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px;">
                 <div class="logo-details" style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
-                    <img id="sidebar-logo" src="logo.png?v=2.7" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
+                    <img id="sidebar-logo" src="logo.png?v=2.8" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
                     <span class="logo-title" style="white-space: nowrap;">Foyer Rural d'Esnoms au Val</span>
                 </div>
                 <!-- Sidebar Toggle Button (Inside Sidebar Logo Container) -->
@@ -1129,6 +1129,137 @@
                         </button>
                     </div>
                 </div>
+
+                <!-- User Profiles Management Panel -->
+                <div class="glass-panel" style="margin-top: 24px;">
+                    <h2>Gestion des Profils Utilisateurs</h2>
+                    <p style="color: var(--text-muted); margin: 12px 0 20px 0; font-size: 0.9rem; line-height: 1.5;">
+                        Configurez des profils d'accès restreints pour les membres de l'association (Président, Secrétaire, etc.).
+                    </p>
+                    
+                    <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 32px; margin-top: 20px;">
+                        <!-- List of current profiles -->
+                        <div>
+                            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Nom du Profil</th>
+                                            <th>Adresse e-mail</th>
+                                            <th style="width: 100px;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="settings-profiles-list">
+                                        <!-- Dynamic profiles list -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Add/Edit form -->
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 20px; align-self: start;">
+                            <h3 id="profile-form-title" style="font-size: 1.1rem; margin-bottom: 16px; font-weight: 600;">Ajouter un Profil</h3>
+                            <form id="form-profile" onsubmit="saveUserProfile(event)">
+                                <input type="hidden" id="profile-id">
+                                <div class="form-group">
+                                    <label for="profile-name">Nom du Profil (Information)</label>
+                                    <input type="text" id="profile-name" placeholder="Ex: Secrétaire" required style="margin-top: 4px;">
+                                </div>
+                                <div class="form-group">
+                                    <label for="profile-email">Adresse e-mail (Connexion)</label>
+                                    <input type="email" id="profile-email" placeholder="secretaire@example.com" required style="margin-top: 4px;">
+                                </div>
+                                <div class="form-group">
+                                    <label for="profile-password">Mot de passe</label>
+                                    <input type="password" id="profile-password" placeholder="Minimum 6 caractères" required style="margin-top: 4px;">
+                                </div>
+                                
+                                <div class="form-group" style="margin-top: 16px;">
+                                    <label style="margin-bottom: 8px; font-weight: 600; display: block;">Permissions des onglets</label>
+                                    <div id="profile-tabs-permissions" style="display: flex; flex-direction: column; gap: 10px; max-height: 250px; overflow-y: auto; padding-right: 8px;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
+                                            <span>Tableau de bord</span>
+                                            <select class="profile-perm-select" data-tab="dashboard" style="width: auto; padding: 4px 8px;">
+                                                <option value="lecture/ecriture">Lecture/Écriture</option>
+                                                <option value="lecture seule">Lecture Seule</option>
+                                                <option value="masqué">Masqué</option>
+                                            </select>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
+                                            <span>Adhérents</span>
+                                            <select class="profile-perm-select" data-tab="adherents" style="width: auto; padding: 4px 8px;">
+                                                <option value="lecture/ecriture">Lecture/Écriture</option>
+                                                <option value="lecture seule">Lecture Seule</option>
+                                                <option value="masqué">Masqué</option>
+                                            </select>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
+                                            <span>Réservation Tennis</span>
+                                            <select class="profile-perm-select" data-tab="tennis" style="width: auto; padding: 4px 8px;">
+                                                <option value="lecture/ecriture">Lecture/Écriture</option>
+                                                <option value="lecture seule">Lecture Seule</option>
+                                                <option value="masqué">Masqué</option>
+                                            </select>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
+                                            <span>Comptabilité</span>
+                                            <select class="profile-perm-select" data-tab="compta" style="width: auto; padding: 4px 8px;">
+                                                <option value="lecture/ecriture">Lecture/Écriture</option>
+                                                <option value="lecture seule">Lecture Seule</option>
+                                                <option value="masqué">Masqué</option>
+                                            </select>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
+                                            <span>Bilan Financier</span>
+                                            <select class="profile-perm-select" data-tab="bilan" style="width: auto; padding: 4px 8px;">
+                                                <option value="lecture/ecriture">Lecture/Écriture</option>
+                                                <option value="lecture seule">Lecture Seule</option>
+                                                <option value="masqué">Masqué</option>
+                                            </select>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
+                                            <span>Manifestations</span>
+                                            <select class="profile-perm-select" data-tab="fete-rurale" style="width: auto; padding: 4px 8px;">
+                                                <option value="lecture/ecriture">Lecture/Écriture</option>
+                                                <option value="lecture seule">Lecture Seule</option>
+                                                <option value="masqué">Masqué</option>
+                                            </select>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
+                                            <span>Boissons & Réserve</span>
+                                            <select class="profile-perm-select" data-tab="boissons" style="width: auto; padding: 4px 8px;">
+                                                <option value="lecture/ecriture">Lecture/Écriture</option>
+                                                <option value="lecture seule">Lecture Seule</option>
+                                                <option value="masqué">Masqué</option>
+                                            </select>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
+                                            <span>Investissements</span>
+                                            <select class="profile-perm-select" data-tab="investissements" style="width: auto; padding: 4px 8px;">
+                                                <option value="lecture/ecriture">Lecture/Écriture</option>
+                                                <option value="lecture seule">Lecture Seule</option>
+                                                <option value="masqué">Masqué</option>
+                                            </select>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
+                                            <span>Réunions & Notes</span>
+                                            <select class="profile-perm-select" data-tab="meetings" style="width: auto; padding: 4px 8px;">
+                                                <option value="lecture/ecriture">Lecture/Écriture</option>
+                                                <option value="lecture seule">Lecture Seule</option>
+                                                <option value="masqué">Masqué</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px;">
+                                    <button type="button" id="btn-cancel-profile-edit" class="btn btn-secondary" style="display: none;" onclick="cancelProfileEdit()">Annuler</button>
+                                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
             </section>
         </main>
     </div>
@@ -1710,6 +1841,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=2.7"></script>
+    <script src="app.js?v=2.8"></script>
 </body>
 </html>

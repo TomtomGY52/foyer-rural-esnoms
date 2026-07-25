@@ -298,6 +298,14 @@ function connectFirebase() {
                 const settingsUnsub = db.collection("settings").doc("app").onSnapshot(doc => {
                     if (doc.exists) {
                         const data = doc.data();
+                        if (data.master_admin_email !== undefined) {
+                            STATE.masterAdminEmail = data.master_admin_email;
+                        } else if (user && user.email) {
+                            db.collection("settings").doc("app").set({ master_admin_email: user.email.toLowerCase() }, { merge: true })
+                                .then(() => { STATE.masterAdminEmail = user.email.toLowerCase(); })
+                                .catch(e => console.error("Error setting master_admin_email:", e));
+                        }
+                        
                         if (data.foyer_logo_url !== undefined) {
                             localStorage.setItem("foyer_logo_url", data.foyer_logo_url);
                         }
@@ -329,7 +337,8 @@ function connectFirebase() {
                 const collections = [
                     'adherents', 'transactions', 'categories', 'manifestations', 
                     'investissements', 'produits', 'reservations', 'notes',
-                    'feteRuraleStands', 'feteRuraleReceipts', 'feteRuraleExpenses', 'feteRuralePartners'
+                    'feteRuraleStands', 'feteRuraleReceipts', 'feteRuraleExpenses', 'feteRuralePartners',
+                    'profiles'
                 ];
                 
                 collections.forEach(col => {
@@ -351,6 +360,9 @@ function connectFirebase() {
                             }
                         }
                         STATE[col] = items;
+                        if (col === 'profiles') {
+                            STATE.profilesLoaded = true;
+                        }
                         refreshAllViews();
                     }, error => {
                         console.error(`Firebase listen error on ${col}:`, error);
@@ -550,6 +562,29 @@ function saveState() {
 
 // --- Sync Views ---
 function refreshAllViews() {
+    // Resolve current user profile
+    if (dbMode === 'firebase' && firebase.auth().currentUser) {
+        const userEmail = firebase.auth().currentUser.email.toLowerCase();
+        
+        if (STATE.masterAdminEmail && userEmail === STATE.masterAdminEmail.toLowerCase()) {
+            STATE.currentUserProfile = null; // Master admin
+        } else {
+            const profile = (STATE.profiles || []).find(p => p.email.toLowerCase() === userEmail);
+            if (profile) {
+                STATE.currentUserProfile = profile;
+            } else if (STATE.profilesLoaded) {
+                // Profile doc is not found but profiles list is loaded: user was deleted/revoked!
+                alert("Ce profil utilisateur a été supprimé ou n'est plus configuré. Accès révoqué.");
+                firebase.auth().signOut();
+                return;
+            } else {
+                STATE.currentUserProfile = null;
+            }
+        }
+    } else {
+        STATE.currentUserProfile = null;
+    }
+
     // Normalize type_flux values to be accented "Dépense"
     if (STATE.transactions) {
         STATE.transactions.forEach(t => {
@@ -581,6 +616,12 @@ function refreshAllViews() {
 
     // Render Fête Rurale Panel
     renderFeteRurale();
+    
+    // Refresh user profiles list
+    renderSettingsProfilesList();
+    
+    // Apply role-based permissions to UI
+    applyPermissionsToUI();
 }
 
 // --- Update Database status badge in UI ---
@@ -615,6 +656,15 @@ function setupNavigation() {
         item.addEventListener("click", (e) => {
             e.preventDefault();
             const tabId = item.getAttribute("data-tab");
+            
+            // Check permissions
+            if (STATE.currentUserProfile && STATE.currentUserProfile.permissions) {
+                const perm = STATE.currentUserProfile.permissions[tabId];
+                if (perm === "masqué") {
+                    alert("Accès non autorisé.");
+                    return;
+                }
+            }
             
             // Remove active from all nav items and panes
             document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
@@ -1014,6 +1064,10 @@ function renderAdherentsList() {
 
 function saveAdherent(e) {
     e.preventDefault();
+    if (!hasWritePermission("adherents")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     const id = document.getElementById("adherent-id").value;
     const numero_adherent = document.getElementById("adherent-numero").value.trim();
     const nom = document.getElementById("adherent-nom").value.trim();
@@ -1104,6 +1158,10 @@ function editAdherent(id) {
 }
 
 function deleteAdherent(id) {
+    if (!hasWritePermission("adherents")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     if (!confirm("Voulez-vous vraiment supprimer cet adhérent ? Cela supprimera également ses réservations de court.")) return;
     
     if (dbMode === 'firebase') {
@@ -1122,6 +1180,10 @@ function deleteAdherent(id) {
 }
 
 function toggleAdherentCotisation(id) {
+    if (!hasWritePermission("adherents")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     const a = STATE.adherents.find(item => item.id === id);
     if (!a) return;
     
@@ -1309,6 +1371,10 @@ function openTennisBookingModal(dateStr, hourStr) {
 
 function saveTennisBooking(e) {
     e.preventDefault();
+    if (!hasWritePermission("tennis")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     const date = document.getElementById("tennis-booking-date").value;
     const hour = document.getElementById("tennis-booking-hour").value;
     const adherent_id = document.getElementById("tennis-booking-adherent").value;
@@ -1334,6 +1400,10 @@ function saveTennisBooking(e) {
 }
 
 function deleteTennisBooking(id) {
+    if (!hasWritePermission("tennis")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     if (!confirm("Voulez-vous vraiment supprimer cette réservation ?")) return;
 
     if (dbMode === 'firebase') {
@@ -1546,6 +1616,10 @@ function calcTransactionMontant() {
 
 function saveTransaction(e) {
     e.preventDefault();
+    if (!hasWritePermission("compta")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     const id = document.getElementById("transaction-id").value;
     const type_flux = document.getElementById("transaction-flux").value;
     const date_transaction = document.getElementById("transaction-date").value;
@@ -1654,6 +1728,10 @@ function editTransaction(id) {
 }
 
 function deleteTransaction(id) {
+    if (!hasWritePermission("compta")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     if (!confirm("Voulez-vous vraiment supprimer cette transaction ?")) return;
 
     if (dbMode === 'firebase') {
@@ -2016,6 +2094,10 @@ function showManifestationDetails(id) {
 
 function saveManifestation(e) {
     e.preventDefault();
+    if (!hasWritePermission("fete-rurale")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     const id = document.getElementById("manifestation-id").value;
     const nom = document.getElementById("manifestation-nom").value;
     const date_debut = document.getElementById("manifestation-debut").value;
@@ -2063,6 +2145,10 @@ function editManifestation(id) {
 }
 
 function deleteManifestation(id) {
+    if (!hasWritePermission("fete-rurale")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     if (!confirm("Voulez-vous vraiment supprimer cet événement ?")) return;
 
     if (dbMode === 'firebase') {
@@ -2158,6 +2244,10 @@ function renderProduitsList() {
 
 function saveProduit(e) {
     e.preventDefault();
+    if (!hasWritePermission("boissons")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     const id = document.getElementById("produit-id").value;
     const nom_boisson = document.getElementById("produit-nom").value;
     const prix = Number(document.getElementById("produit-prix").value) || 0;
@@ -2205,6 +2295,10 @@ function editProduit(id) {
 }
 
 function deleteProduit(id) {
+    if (!hasWritePermission("boissons")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     if (!confirm("Voulez-vous vraiment supprimer ce produit de la réserve ?")) return;
 
     if (dbMode === 'firebase') {
@@ -2273,6 +2367,10 @@ function calcInventoryDiff(id) {
 
 function saveInventoryAdjustments(e) {
     e.preventDefault();
+    if (!hasWritePermission("boissons")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     const rows = document.querySelectorAll("#inventory-table-body tr");
     const todayStr = formatDate(new Date());
     
@@ -2453,6 +2551,10 @@ function renderInvestissementsList() {
 
 function saveInvestissement(e) {
     e.preventDefault();
+    if (!hasWritePermission("investissements")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     const id = document.getElementById("investissement-id").value;
     const libelle = document.getElementById("invest-libelle").value;
     const date_acquisition = document.getElementById("invest-date").value;
@@ -2533,6 +2635,10 @@ function editInvestissement(id) {
 }
 
 function deleteInvestissement(id) {
+    if (!hasWritePermission("investissements")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     if (!confirm("Voulez-vous vraiment supprimer cet investissement ?")) return;
 
     if (dbMode === 'firebase') {
@@ -2606,6 +2712,10 @@ function selectNote(id) {
 }
 
 function createNewNote() {
+    if (!hasWritePermission("meetings")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     selectedNoteId = null;
     
     document.getElementById("edit-note-id").value = "";
@@ -2620,6 +2730,10 @@ function createNewNote() {
 }
 
 function editNote(id) {
+    if (!hasWritePermission("meetings")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     const n = STATE.notes.find(item => item.id === id);
     if (!n) return;
 
@@ -2648,6 +2762,10 @@ function cancelNoteEdit() {
 }
 
 function saveNote() {
+    if (!hasWritePermission("meetings")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     const id = document.getElementById("edit-note-id").value;
     const titre = document.getElementById("edit-note-title").value;
     const date_reunion = document.getElementById("edit-note-date").value;
@@ -2694,6 +2812,10 @@ function saveNote() {
 }
 
 function deleteNote(id) {
+    if (!hasWritePermission("meetings")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     if (!confirm("Voulez-vous vraiment supprimer cette note ?")) return;
 
     if (dbMode === 'firebase') {
@@ -3429,6 +3551,10 @@ function cancelCategoryEdit() {
 
 function saveCategory(e) {
     e.preventDefault();
+    if (dbMode === 'firebase' && STATE.currentUserProfile) {
+        alert("Action réservée à l'administrateur maître.");
+        return;
+    }
     const id = document.getElementById("category-id").value;
     const libelle = document.getElementById("category-libelle").value.trim();
     const type = document.getElementById("category-type").value;
@@ -3466,7 +3592,10 @@ function saveCategory(e) {
 }
 
 function deleteCategory(id) {
-    
+    if (dbMode === 'firebase' && STATE.currentUserProfile) {
+        alert("Action réservée à l'administrateur maître.");
+        return;
+    }
     const inUseCount = STATE.transactions.filter(t => t.categorie_id === id).length;
     if (inUseCount > 0) {
         if (!confirm(`Cette catégorie est utilisée par ${inUseCount} transaction(s). Sa suppression dissociera ces transactions. Voulez-vous continuer ?`)) {
@@ -3722,6 +3851,10 @@ function editFeteStand(id) {
 
 function saveFeteStand(e) {
     e.preventDefault();
+    if (!hasWritePermission("fete-rurale")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     const id = document.getElementById("fete-stand-id").value || "stand-" + Date.now();
     const nom = document.getElementById("fete-stand-nom").value;
     const fond = Number(document.getElementById("fete-stand-fond").value) || 0;
@@ -3736,6 +3869,10 @@ function saveFeteStand(e) {
 }
 
 function deleteFeteStand(id) {
+    if (!hasWritePermission("fete-rurale")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     const stand = STATE.feteRuraleStands.find(s => s.id === id);
     if (!stand) return;
     
@@ -3799,6 +3936,10 @@ function editFeteReceipt(id) {
 
 function saveFeteReceipt(e) {
     e.preventDefault();
+    if (!hasWritePermission("fete-rurale")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     const id = document.getElementById("fete-receipt-id").value || "rec-" + Date.now();
     const standId = document.getElementById("fete-receipt-stand-id").value;
     const date = document.getElementById("fete-receipt-date").value;
@@ -3844,6 +3985,10 @@ function saveFeteReceipt(e) {
 }
 
 function deleteFeteReceipt(id) {
+    if (!hasWritePermission("fete-rurale")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     const rec = STATE.feteRuraleReceipts.find(r => r.id === id);
     if (!rec) return;
     if (!confirm("Voulez-vous vraiment supprimer ce relevé de caisse ? La transaction comptable associée sera également supprimée.")) return;
@@ -3899,6 +4044,10 @@ function editFeteExpense(id) {
 
 function saveFeteExpense(e) {
     e.preventDefault();
+    if (!hasWritePermission("fete-rurale")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     const id = document.getElementById("fete-expense-id").value || "exp-" + Date.now();
     const description = document.getElementById("fete-expense-desc").value;
     const date = document.getElementById("fete-expense-date").value;
@@ -3998,6 +4147,10 @@ function saveFeteExpense(e) {
 }
 
 function deleteFeteExpense(id) {
+    if (!hasWritePermission("fete-rurale")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     const exp = STATE.feteRuraleExpenses.find(e => e.id === id);
     if (!exp) return;
     if (!confirm("Voulez-vous vraiment supprimer cette dépense ? La transaction comptable associée sera également supprimée.")) return;
@@ -4048,6 +4201,10 @@ function editFetePartner(id) {
 
 function saveFetePartner(e) {
     e.preventDefault();
+    if (!hasWritePermission("fete-rurale")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     const id = document.getElementById("fete-partner-id").value || "part-" + Date.now();
     const entreprise = document.getElementById("fete-partner-entreprise").value;
     const contact = document.getElementById("fete-partner-contact").value;
@@ -4117,6 +4274,10 @@ function saveFetePartner(e) {
 }
 
 function deleteFetePartner(id) {
+    if (!hasWritePermission("fete-rurale")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
     const part = STATE.feteRuralePartners.find(p => p.id === id);
     if (!part) return;
     if (!confirm("Voulez-vous vraiment supprimer ce partenaire ? La transaction comptable associée sera également supprimée.")) return;
@@ -4692,6 +4853,10 @@ function updateLogoControls(logoUrl, opacity) {
 }
 
 function handleLogoUpload(e) {
+    if (dbMode === 'firebase' && STATE.currentUserProfile) {
+        alert("Action réservée à l'administrateur maître.");
+        return;
+    }
     const file = e.target.files[0];
     if (!file) return;
     
@@ -4727,6 +4892,10 @@ function handleLogoUpload(e) {
 }
 
 function updateLogoOpacityFromRange(val) {
+    if (dbMode === 'firebase' && STATE.currentUserProfile) {
+        alert("Action réservée à l'administrateur maître.");
+        return;
+    }
     const opacity = Number(val) / 100;
     localStorage.setItem("foyer_logo_opacity", opacity);
     
@@ -4743,6 +4912,10 @@ function updateLogoOpacityFromRange(val) {
 }
 
 function resetLogoSettings() {
+    if (dbMode === 'firebase' && STATE.currentUserProfile) {
+        alert("Action réservée à l'administrateur maître.");
+        return;
+    }
     localStorage.removeItem("foyer_logo_url");
     localStorage.removeItem("foyer_logo_opacity");
     
@@ -4768,11 +4941,373 @@ function getCotisationAmount() {
 }
 
 function saveCotisationAmountSetting(val) {
+    if (dbMode === 'firebase' && STATE.currentUserProfile) {
+        alert("Action réservée à l'administrateur maître.");
+        return;
+    }
     const amount = Number(val) || 20.00;
     localStorage.setItem("foyer_cotisation_amount", amount);
     if (dbMode === 'firebase') {
         db.collection("settings").doc("app").set({ foyer_cotisation_amount: amount }, { merge: true })
             .catch(err => console.error("Failed to sync cotisation amount:", err));
     }
+}
+
+function hasWritePermission(tabId) {
+    if (dbMode !== 'firebase') return true;
+    const profile = STATE.currentUserProfile;
+    if (!profile) return true; // Master admin has full access
+    const perm = profile.permissions ? (profile.permissions[tabId] || "lecture/ecriture") : "lecture/ecriture";
+    return perm === "lecture/ecriture";
+}
+
+function applyPermissionsToUI() {
+    const profile = STATE.currentUserProfile;
+    const tabs = ["dashboard", "adherents", "tennis", "compta", "bilan", "fete-rurale", "boissons", "investissements", "meetings"];
+    
+    // Master admin or local mode: restore everything
+    if (!profile || dbMode !== 'firebase') {
+        tabs.forEach(tabId => {
+            const link = document.querySelector(`.nav-item[data-tab="${tabId}"]`);
+            if (link) link.parentElement.style.display = "";
+            
+            const tabPane = document.getElementById(`tab-${tabId}`);
+            if (tabPane) {
+                const actions = tabPane.querySelectorAll("button, .btn, input[type='submit']");
+                actions.forEach(el => el.style.removeProperty("display"));
+            }
+            if (tabId === "tennis") {
+                const slots = document.querySelectorAll(".calendar-slot");
+                slots.forEach(s => {
+                    s.style.removeProperty("cursor");
+                    s.style.removeProperty("opacity");
+                });
+            }
+        });
+        
+        const adminOnlyPanels = document.querySelectorAll("#tab-settings .glass-panel");
+        adminOnlyPanels.forEach(panel => {
+            panel.style.display = "";
+        });
+        return;
+    }
+    
+    // Restricted profile: hide tabs and buttons
+    tabs.forEach(tabId => {
+        const perm = profile.permissions ? (profile.permissions[tabId] || "lecture/ecriture") : "lecture/ecriture";
+        
+        // Hide/show sidebar links
+        const link = document.querySelector(`.nav-item[data-tab="${tabId}"]`);
+        if (link) {
+            if (perm === "masqué") {
+                link.parentElement.style.display = "none";
+            } else {
+                link.parentElement.style.display = "";
+            }
+        }
+        
+        // Hide modification controls in page content
+        const tabPane = document.getElementById(`tab-${tabId}`);
+        if (tabPane) {
+            const actions = tabPane.querySelectorAll("button, .btn, input[type='submit'], select[onchange], input[onchange]");
+            actions.forEach(el => {
+                const onclick = el.getAttribute("onclick") || "";
+                const text = el.innerText.toLowerCase();
+                
+                const isWriteAction = 
+                    text.includes("ajouter") || 
+                    text.includes("modifier") || 
+                    text.includes("supprimer") || 
+                    text.includes("enregistrer") || 
+                    text.includes("créer") || 
+                    text.includes("importer") || 
+                    text.includes("sauvegarder") ||
+                    text.includes("nouveau") ||
+                    text.includes("nouvel") ||
+                    text.includes("nouvelle") ||
+                    onclick.includes("add") || 
+                    onclick.includes("edit") || 
+                    onclick.includes("delete") || 
+                    onclick.includes("save") || 
+                    onclick.includes("reset") ||
+                    onclick.includes("import") ||
+                    onclick.includes("openFete") ||
+                    onclick.includes("bookTennis") ||
+                    onclick.includes("cancelTennis") ||
+                    (el.tagName === "BUTTON" && (el.classList.contains("btn-primary") || el.classList.contains("btn-success") || el.classList.contains("btn-danger")));
+                    
+                if (isWriteAction) {
+                    if (perm === "lecture seule") {
+                        el.style.setProperty("display", "none", "important");
+                    } else {
+                        el.style.removeProperty("display");
+                    }
+                }
+            });
+            
+            // Special disable styling for Tennis slot cell clicks
+            if (tabId === "tennis") {
+                const slots = tabPane.querySelectorAll(".calendar-slot");
+                slots.forEach(s => {
+                    if (perm === "lecture seule") {
+                        s.style.setProperty("cursor", "default", "important");
+                        s.style.setProperty("opacity", "0.7", "important");
+                    } else {
+                        s.style.removeProperty("cursor");
+                        s.style.removeProperty("opacity");
+                    }
+                });
+            }
+        }
+    });
+    
+    // Hide administrative panels in settings tab
+    const adminOnlyPanels = document.querySelectorAll("#tab-settings .glass-panel");
+    adminOnlyPanels.forEach(panel => {
+        if (panel.innerHTML.includes("Version &amp; Dernières Modifications") || panel.innerHTML.includes("Version & Dernières Modifications")) {
+            panel.style.display = "";
+        } else {
+            panel.style.display = "none";
+        }
+    });
+    
+    // Redirect active masked tab to first visible tab
+    const activeTabPane = document.querySelector(".tab-pane.active");
+    if (activeTabPane) {
+        const activeTabId = activeTabPane.id.replace("tab-", "");
+        const perm = profile.permissions ? (profile.permissions[activeTabId] || "lecture/ecriture") : "lecture/ecriture";
+        if (perm === "masqué") {
+            const firstVisibleLink = Array.from(document.querySelectorAll(".nav-item")).find(link => {
+                const tId = link.getAttribute("data-tab");
+                const p = profile.permissions ? (profile.permissions[tId] || "lecture/ecriture") : "lecture/ecriture";
+                return p !== "masqué";
+            });
+            if (firstVisibleLink) {
+                firstVisibleLink.click();
+            }
+        }
+    }
+}
+
+// ============================================================================
+// --- USER PROFILES CRUD & HANDLERS ---
+// ============================================================================
+function renderSettingsProfilesList() {
+    const list = document.getElementById("settings-profiles-list");
+    if (!list) return;
+    list.innerHTML = "";
+    
+    const profiles = STATE.profiles || [];
+    if (profiles.length === 0) {
+        list.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 16px;">Aucun profil utilisateur configuré.</td></tr>`;
+        return;
+    }
+    
+    profiles.forEach(p => {
+        list.innerHTML += `
+            <tr>
+                <td style="font-weight: 500;">${p.name}</td>
+                <td>${p.email}</td>
+                <td>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-secondary btn-icon-only btn-sm" onclick="editUserProfile('${p.id}')" title="Modifier">
+                            <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i>
+                        </button>
+                        <button class="btn btn-secondary btn-icon-only btn-sm" style="color: var(--danger);" onclick="deleteUserProfile('${p.id}')" title="Supprimer">
+                            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+    lucide.createIcons();
+}
+
+function editUserProfile(id) {
+    const p = (STATE.profiles || []).find(x => x.id === id);
+    if (!p) return;
+    
+    document.getElementById("profile-id").value = p.id;
+    document.getElementById("profile-name").value = p.name;
+    
+    const emailInput = document.getElementById("profile-email");
+    emailInput.value = p.email;
+    emailInput.disabled = true; // Email cannot be edited after creation
+    
+    document.getElementById("profile-password").value = p.password;
+    
+    document.getElementById("profile-form-title").innerText = "Modifier le Profil - " + p.name;
+    document.getElementById("btn-cancel-profile-edit").style.display = "inline-flex";
+    
+    document.querySelectorAll(".profile-perm-select").forEach(sel => {
+        const tab = sel.getAttribute("data-tab");
+        sel.value = p.permissions ? (p.permissions[tab] || "lecture/ecriture") : "lecture/ecriture";
+    });
+}
+
+function cancelProfileEdit() {
+    document.getElementById("form-profile").reset();
+    document.getElementById("profile-id").value = "";
+    
+    const emailInput = document.getElementById("profile-email");
+    emailInput.disabled = false;
+    
+    document.getElementById("profile-form-title").innerText = "Ajouter un Profil";
+    document.getElementById("btn-cancel-profile-edit").style.display = "none";
+    
+    document.querySelectorAll(".profile-perm-select").forEach(sel => {
+        sel.value = "lecture/ecriture";
+    });
+}
+
+function saveUserProfile(e) {
+    e.preventDefault();
+    const id = document.getElementById("profile-id").value;
+    const name = document.getElementById("profile-name").value.trim();
+    const email = document.getElementById("profile-email").value.trim();
+    const password = document.getElementById("profile-password").value;
+    
+    if (password.length < 6) {
+        alert("Le mot de passe doit contenir au moins 6 caractères.");
+        return;
+    }
+    
+    const permissions = {};
+    document.querySelectorAll(".profile-perm-select").forEach(sel => {
+        permissions[sel.getAttribute("data-tab")] = sel.value;
+    });
+    
+    if (dbMode !== 'firebase') {
+        alert("La gestion des profils requiert le mode Firebase Cloud.");
+        return;
+    }
+    
+    const submitBtn = e.target.querySelector("button[type='submit']");
+    
+    if (!id) {
+        // Create new profile
+        if (STATE.profiles && STATE.profiles.some(p => p.email.toLowerCase() === email.toLowerCase())) {
+            alert("Un profil avec cette adresse e-mail existe déjà.");
+            return;
+        }
+        
+        submitBtn.disabled = true;
+        submitBtn.innerText = "Création en cours...";
+        
+        const docId = email.toLowerCase().replace(/[^a-z0-9]/g, "_");
+        const secondaryApp = firebase.initializeApp(STATE.firebaseConfig, "SecondaryApp" + Date.now());
+        
+        secondaryApp.auth().createUserWithEmailAndPassword(email, password)
+            .then(() => {
+                const profileObj = {
+                    id: docId,
+                    name,
+                    email,
+                    password,
+                    permissions
+                };
+                db.collection("profiles").doc(docId).set(profileObj)
+                    .then(() => {
+                        secondaryApp.delete();
+                        cancelProfileEdit();
+                        alert("Profil créé avec succès !");
+                    })
+                    .catch(err => {
+                        alert("Erreur d'enregistrement Firestore : " + err.message);
+                        secondaryApp.delete();
+                        submitBtn.disabled = false;
+                        submitBtn.innerText = "Enregistrer";
+                    });
+            })
+            .catch(err => {
+                alert("Erreur de création de compte d'accès : " + err.message);
+                secondaryApp.delete();
+                submitBtn.disabled = false;
+                submitBtn.innerText = "Enregistrer";
+            });
+    } else {
+        // Edit existing profile
+        const existing = (STATE.profiles || []).find(p => p.id === id);
+        if (!existing) return;
+        
+        submitBtn.disabled = true;
+        submitBtn.innerText = "Mise à jour...";
+        
+        if (password !== existing.password) {
+            const secondaryApp = firebase.initializeApp(STATE.firebaseConfig, "SecondaryApp" + Date.now());
+            secondaryApp.auth().signInWithEmailAndPassword(email, existing.password)
+                .then(userCredential => {
+                    userCredential.user.updatePassword(password)
+                        .then(() => {
+                            updateDocAndFinish();
+                        })
+                        .catch(err => {
+                            alert("Échec de la mise à jour du mot de passe : " + err.message);
+                            secondaryApp.delete();
+                            submitBtn.disabled = false;
+                            submitBtn.innerText = "Enregistrer";
+                        });
+                })
+                .catch(err => {
+                    alert("Erreur d'authentification sur le profil pour mise à jour : " + err.message);
+                    secondaryApp.delete();
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = "Enregistrer";
+                });
+                
+            function updateDocAndFinish() {
+                const profileObj = {
+                    id,
+                    name,
+                    email,
+                    password,
+                    permissions
+                };
+                db.collection("profiles").doc(id).set(profileObj)
+                    .then(() => {
+                        secondaryApp.delete();
+                        cancelProfileEdit();
+                        alert("Profil mis à jour avec succès !");
+                    })
+                    .catch(err => {
+                        alert("Erreur de mise à jour Firestore : " + err.message);
+                        secondaryApp.delete();
+                        submitBtn.disabled = false;
+                        submitBtn.innerText = "Enregistrer";
+                    });
+            }
+        } else {
+            // Password did not change
+            const profileObj = {
+                id,
+                name,
+                email,
+                password,
+                permissions
+            };
+            db.collection("profiles").doc(id).set(profileObj)
+                .then(() => {
+                    cancelProfileEdit();
+                    alert("Profil mis à jour avec succès !");
+                })
+                .catch(err => {
+                    alert("Erreur de mise à jour Firestore : " + err.message);
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = "Enregistrer";
+                });
+        }
+    }
+}
+
+function deleteUserProfile(id) {
+    if (dbMode !== 'firebase') return;
+    if (!confirm("Voulez-vous vraiment supprimer ce profil ? Il n'aura plus d'accès à l'application.")) return;
+    
+    db.collection("profiles").doc(id).delete()
+        .then(() => {
+            alert("Profil supprimé de la base de données. Accès révoqué.");
+        })
+        .catch(err => alert("Erreur lors de la suppression : " + err.message));
 }
 
