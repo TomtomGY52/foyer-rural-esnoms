@@ -3534,6 +3534,14 @@ function populateSelectOptions() {
         });
     }
 
+    const feteExpEquip = document.getElementById("fete-expense-equipement");
+    if (feteExpEquip) {
+        feteExpEquip.innerHTML = `<option value="">-- Aucun (Manifestation seule) --</option>`;
+        (STATE.sharedEquipments || []).forEach(eq => {
+            feteExpEquip.innerHTML += `<option value="${eq.id}">🎪 Équipement: ${eq.nom}</option>`;
+        });
+    }
+
     // 3. Filter dropdowns in Accounting list
     const filterCat = document.getElementById("filter-categorie");
     if (filterCat) {
@@ -4205,6 +4213,9 @@ function openFeteExpenseModal() {
     document.getElementById("fete-expense-id").value = "";
     document.getElementById("fete-expense-date").value = new Date().toISOString().split('T')[0];
     document.getElementById("fete-expense-scan-data").value = "";
+    if (document.getElementById("fete-expense-equipement")) {
+        document.getElementById("fete-expense-equipement").value = "";
+    }
     const m = STATE.manifestations.find(item => item.id === activeManifestationId);
     const mName = m ? m.nom : "Manifestation";
     document.getElementById("fete-expense-modal-title").innerText = "Nouvelle Dépense - " + mName;
@@ -4236,6 +4247,9 @@ function editFeteExpense(id) {
     document.getElementById("fete-expense-paye").checked = exp.paye;
     document.getElementById("fete-expense-comment").value = exp.commentaire || "";
     document.getElementById("fete-expense-scan-data").value = exp.scan || "";
+    if (document.getElementById("fete-expense-equipement")) {
+        document.getElementById("fete-expense-equipement").value = exp.equipement_id || "";
+    }
     document.getElementById("fete-expense-modal-title").innerText = "Modifier la Dépense";
     
     openModal("modal-fete-expense");
@@ -4257,6 +4271,7 @@ function saveFeteExpense(e) {
     const paye = document.getElementById("fete-expense-paye").checked;
     const comment = document.getElementById("fete-expense-comment").value;
     const scan = document.getElementById("fete-expense-scan-data").value;
+    const equipement_id = document.getElementById("fete-expense-equipement") ? document.getElementById("fete-expense-equipement").value : "";
     
     const exp = STATE.feteRuraleExpenses.find(x => x.id === id);
     const existingTxId = exp ? exp.transaction_id : "";
@@ -4270,7 +4285,8 @@ function saveFeteExpense(e) {
         paye,
         moyen_payement: moyen,
         categorie_id: feteCat,
-        manifestation_id: activeManifestationId
+        manifestation_id: activeManifestationId,
+        equipement_id
     };
     
     syncFeteFinancialToTransactions(existingTxId, txData, (newTxId) => {
@@ -4283,7 +4299,8 @@ function saveFeteExpense(e) {
                 paye,
                 moyen_payement: 'Réserve',
                 categorie_id: feteCat,
-                manifestation_id: "" // General transaction
+                manifestation_id: "",
+                equipement_id: ""
             };
             
             syncFeteFinancialToTransactions(existingReserveTxId, reserveTxData, (newReserveTxId) => {
@@ -4300,7 +4317,8 @@ function saveFeteExpense(e) {
                     scan,
                     transaction_id: newTxId,
                     reserve_transaction_id: newReserveTxId,
-                    manifestation_id: activeManifestationId
+                    manifestation_id: activeManifestationId,
+                    equipement_id
                 };
                 saveFeteData("feteRuraleExpenses", expenseObj, () => {
                     closeModal("modal-fete-expense");
@@ -4332,7 +4350,8 @@ function saveFeteExpense(e) {
                     scan,
                     transaction_id: newTxId,
                     reserve_transaction_id: "",
-                    manifestation_id: activeManifestationId
+                    manifestation_id: activeManifestationId,
+                    equipement_id
                 };
                 saveFeteData("feteRuraleExpenses", expenseObj, () => {
                     closeModal("modal-fete-expense");
