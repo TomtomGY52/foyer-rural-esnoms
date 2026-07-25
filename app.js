@@ -3930,7 +3930,7 @@ function saveFeteExpense(e) {
             const reserveTxData = {
                 date,
                 description: `[Déduction Réserve] ${description}`,
-                type_flux: 'Recette',
+                type_flux: 'Dépense',
                 montant: -montant,
                 paye,
                 moyen_payement: 'Réserve',
