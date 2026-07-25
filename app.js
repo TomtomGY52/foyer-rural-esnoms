@@ -3543,7 +3543,7 @@ function syncFeteFinancialToTransactions(txId, txData, callback) {
             moyen_payement: txData.moyen_payement || "Espèces",
             categorie_id: txData.categorie_id,
             adherent_id: "",
-            manifestation_id: txData.manifestation_id || "man-fete-rurale",
+            manifestation_id: txData.manifestation_id !== undefined ? txData.manifestation_id : "man-fete-rurale",
             investissement_id: "",
             produit_id: ""
         };
@@ -3576,7 +3576,7 @@ function syncFeteFinancialToTransactions(txId, txData, callback) {
                             paye: txData.paye !== undefined ? txData.paye : true,
                             moyen_payement: txData.moyen_payement || "Espèces",
                             categorie_id: txData.categorie_id,
-                            manifestation_id: txData.manifestation_id || existing.manifestation_id || "man-fete-rurale"
+                            manifestation_id: txData.manifestation_id !== undefined ? txData.manifestation_id : (existing.manifestation_id || "man-fete-rurale")
                         };
                         db.collection("transactions").doc(txId).set(updatedTx)
                             .then(() => {
@@ -3601,7 +3601,7 @@ function syncFeteFinancialToTransactions(txId, txData, callback) {
                     paye: txData.paye !== undefined ? txData.paye : true,
                     moyen_payement: txData.moyen_payement || "Espèces",
                     categorie_id: txData.categorie_id,
-                    manifestation_id: txData.manifestation_id || STATE.transactions[idx].manifestation_id || "man-fete-rurale"
+                    manifestation_id: txData.manifestation_id !== undefined ? txData.manifestation_id : (STATE.transactions[idx].manifestation_id || "man-fete-rurale")
                 };
                 saveState();
                 if (callback) callback(txId);
@@ -3899,6 +3899,7 @@ function saveFeteExpense(e) {
     
     const exp = STATE.feteRuraleExpenses.find(x => x.id === id);
     const existingTxId = exp ? exp.transaction_id : "";
+    const existingReserveTxId = exp ? (exp.reserve_transaction_id || "") : "";
     
     const txData = {
         date,
@@ -3912,26 +3913,74 @@ function saveFeteExpense(e) {
     };
     
     syncFeteFinancialToTransactions(existingTxId, txData, (newTxId) => {
-        const expenseObj = {
-            id,
-            description,
-            date,
-            montant,
-            paye,
-            moyen_payement: moyen,
-            paye_a: payea,
-            categorie: feteCat,
-            commentaire: comment,
-            scan,
-            transaction_id: newTxId,
-            manifestation_id: activeManifestationId
-        };
-        saveFeteData("feteRuraleExpenses", expenseObj, () => {
-            closeModal("modal-fete-expense");
-            document.getElementById("form-fete-expense").reset();
-            document.getElementById("fete-expense-id").value = "";
-            refreshAllViews();
-        });
+        if (moyen === 'Réserve') {
+            const reserveTxData = {
+                date,
+                description: `[Déduction Réserve] ${description}`,
+                type_flux: 'Recette',
+                montant: -montant,
+                paye,
+                moyen_payement: 'Réserve',
+                categorie_id: feteCat,
+                manifestation_id: "" // General transaction
+            };
+            
+            syncFeteFinancialToTransactions(existingReserveTxId, reserveTxData, (newReserveTxId) => {
+                const expenseObj = {
+                    id,
+                    description,
+                    date,
+                    montant,
+                    paye,
+                    moyen_payement: moyen,
+                    paye_a: payea,
+                    categorie: feteCat,
+                    commentaire: comment,
+                    scan,
+                    transaction_id: newTxId,
+                    reserve_transaction_id: newReserveTxId,
+                    manifestation_id: activeManifestationId
+                };
+                saveFeteData("feteRuraleExpenses", expenseObj, () => {
+                    closeModal("modal-fete-expense");
+                    document.getElementById("form-fete-expense").reset();
+                    document.getElementById("fete-expense-id").value = "";
+                    refreshAllViews();
+                });
+            });
+        } else {
+            if (existingReserveTxId) {
+                deleteFeteFinancialTransaction(existingReserveTxId, () => {
+                    saveExpenseAndFinish();
+                });
+            } else {
+                saveExpenseAndFinish();
+            }
+
+            function saveExpenseAndFinish() {
+                const expenseObj = {
+                    id,
+                    description,
+                    date,
+                    montant,
+                    paye,
+                    moyen_payement: moyen,
+                    paye_a: payea,
+                    categorie: feteCat,
+                    commentaire: comment,
+                    scan,
+                    transaction_id: newTxId,
+                    reserve_transaction_id: "",
+                    manifestation_id: activeManifestationId
+                };
+                saveFeteData("feteRuraleExpenses", expenseObj, () => {
+                    closeModal("modal-fete-expense");
+                    document.getElementById("form-fete-expense").reset();
+                    document.getElementById("fete-expense-id").value = "";
+                    refreshAllViews();
+                });
+            }
+        }
     });
 }
 
@@ -3941,9 +3990,17 @@ function deleteFeteExpense(id) {
     if (!confirm("Voulez-vous vraiment supprimer cette dépense ? La transaction comptable associée sera également supprimée.")) return;
     
     deleteFeteFinancialTransaction(exp.transaction_id, () => {
-        deleteFeteData("feteRuraleExpenses", id, () => {
-            refreshAllViews();
-        });
+        if (exp.reserve_transaction_id) {
+            deleteFeteFinancialTransaction(exp.reserve_transaction_id, () => {
+                deleteFeteData("feteRuraleExpenses", id, () => {
+                    refreshAllViews();
+                });
+            });
+        } else {
+            deleteFeteData("feteRuraleExpenses", id, () => {
+                refreshAllViews();
+            });
+        }
     });
 }
 
