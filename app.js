@@ -22,6 +22,7 @@ let STATE = {
     currentPeriod: "",
     profiles: [],
     evolutionNotes: [],
+    sharedEquipments: [],
     currentUserProfile: null,
     masterAdminEmail: null,
     profilesLoaded: false,
@@ -350,7 +351,7 @@ function connectFirebase() {
                     'adherents', 'transactions', 'categories', 'manifestations', 
                     'investissements', 'produits', 'reservations', 'notes',
                     'feteRuraleStands', 'feteRuraleReceipts', 'feteRuraleExpenses', 'feteRuralePartners',
-                    'profiles', 'evolutionNotes'
+                    'profiles', 'evolutionNotes', 'sharedEquipments'
                 ];
                 
                 collections.forEach(col => {
@@ -635,6 +636,9 @@ function refreshAllViews() {
     
     // Refresh Evolution Notes list
     renderEvolutionNotesList();
+    
+    // Refresh Shared Equipments list
+    renderSettingsEquipmentsList();
     
     // Apply role-based permissions to UI
     applyPermissionsToUI();
@@ -1546,11 +1550,6 @@ function renderGeneralExpensesList() {
         return 0;
     });
 
-    if (filtered.length === 0) {
-        listBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 32px;">Aucune dépense générale enregistrée</td></tr>`;
-        return;
-    }
-
     filtered.forEach(t => {
         const dateStr = formatDateFrench(new Date(t.date_transaction));
         const cat = STATE.categories.find(c => c.id === t.categorie_id);
@@ -1558,12 +1557,20 @@ function renderGeneralExpensesList() {
         
         const payeBadgeClass = t.paye ? "badge-success" : "badge-warning";
         const payeLabel = t.paye ? "Réglé" : "En attente";
-        
+
+        let eqBadge = "";
+        if (t.equipement_id) {
+            const eq = (STATE.sharedEquipments || []).find(e => e.id === t.equipement_id);
+            if (eq) {
+                eqBadge = `<span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.3); margin-left: 6px; font-size: 0.75rem; font-weight: 600;"><i data-lucide="tent" style="width: 10px; height: 10px; vertical-align: middle; margin-right: 2px;"></i> ${eq.nom}</span>`;
+            }
+        }
+
         listBody.innerHTML += `
             <tr>
                 <td>${dateStr}</td>
                 <td>${catLabel}</td>
-                <td style="font-weight: 500;">${t.description}</td>
+                <td style="font-weight: 500;">${t.description}${eqBadge}</td>
                 <td style="font-weight: 600; text-align: right; color: var(--danger);">${Number(t.montant).toFixed(2)} €</td>
                 <td>
                     <span class="badge ${payeBadgeClass}" style="cursor: pointer;" onclick="toggleTransactionPaid('${t.id}')" title="Changer statut de paiement">
@@ -1651,11 +1658,19 @@ function renderGeneralReceiptsList() {
         const payeBadgeClass = t.paye ? "badge-success" : "badge-warning";
         const payeLabel = t.paye ? "Réglé" : "En attente";
         
+        let eqBadge = "";
+        if (t.equipement_id) {
+            const eq = (STATE.sharedEquipments || []).find(e => e.id === t.equipement_id);
+            if (eq) {
+                eqBadge = `<span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.3); margin-left: 6px; font-size: 0.75rem; font-weight: 600;"><i data-lucide="tent" style="width: 10px; height: 10px; vertical-align: middle; margin-right: 2px;"></i> ${eq.nom}</span>`;
+            }
+        }
+
         listBody.innerHTML += `
             <tr>
                 <td>${dateStr}</td>
                 <td>${catLabel}</td>
-                <td style="font-weight: 500;">${t.description}</td>
+                <td style="font-weight: 500;">${t.description}${eqBadge}</td>
                 <td style="font-weight: 600; text-align: right; color: var(--secondary);">${Number(t.montant).toFixed(2)} €</td>
                 <td>
                     <span class="badge ${payeBadgeClass}" style="cursor: pointer;" onclick="toggleTransactionPaid('${t.id}')" title="Changer statut de paiement">
@@ -1710,11 +1725,12 @@ function saveTransaction(e) {
     const manifestation_id = document.getElementById("transaction-manifestation").value;
     const investissement_id = document.getElementById("transaction-investissement").value;
     const produit_id = document.getElementById("transaction-produit").value;
+    const equipement_id = document.getElementById("transaction-equipement") ? document.getElementById("transaction-equipement").value : "";
 
     const data = {
         type_flux, date_transaction, categorie_id, moyen_payement,
         prix, quantite, montant, paye, description,
-        adherent_id, manifestation_id, investissement_id, produit_id
+        adherent_id, manifestation_id, investissement_id, produit_id, equipement_id
     };
 
     if (dbMode === 'firebase') {
@@ -1792,6 +1808,9 @@ function editTransaction(id) {
     document.getElementById("transaction-manifestation").value = t.manifestation_id || "";
     document.getElementById("transaction-investissement").value = t.investissement_id || "";
     document.getElementById("transaction-produit").value = t.produit_id || "";
+    if (document.getElementById("transaction-equipement")) {
+        document.getElementById("transaction-equipement").value = t.equipement_id || "";
+    }
     
     // Dynamically filter categories based on the context of this transaction
     updateTransactionCategoriesDropdown();
@@ -2007,6 +2026,91 @@ function renderBilanAnnuel() {
             manifHeaderTotal.style.color = "var(--danger)";
         } else {
             manifHeaderTotal.style.color = "var(--text-main)";
+        }
+    }
+
+    // 7. Render Shared Equipments Bilan Summary
+    const equipSummaryTable = document.getElementById("bilan-equipements-summary");
+    const equipHeaderTotal = document.getElementById("bilan-equipements-header-total");
+    if (equipSummaryTable) {
+        equipSummaryTable.innerHTML = "";
+        const sharedEquips = STATE.sharedEquipments || [];
+        let grandTotalEquipNet = 0;
+
+        if (sharedEquips.length === 0) {
+            equipSummaryTable.innerHTML = `<tr><td colspan="5" style="color: var(--text-muted); text-align: center;">Aucun équipement partagé configuré</td></tr>`;
+        } else {
+            sharedEquips.forEach(eq => {
+                let eqRec = 0;
+                let eqDep = 0;
+                let eqTxList = [];
+
+                STATE.transactions.forEach(t => {
+                    if (t.equipement_id === eq.id && t.paye && isDateInPeriod(t.date_transaction, STATE.currentPeriod)) {
+                        const amt = Number(t.montant) || 0;
+                        eqTxList.push(t);
+                        if (t.type_flux === "Recette") {
+                            eqRec += amt;
+                        } else {
+                            eqDep += amt;
+                        }
+                    }
+                });
+
+                const eqNet = eqRec - eqDep;
+                grandTotalEquipNet += eqNet;
+
+                const partners = eq.partners || [];
+                let partnersHtml = "";
+                if (partners.length === 0) {
+                    partnersHtml = `<span style="color: var(--text-muted); font-size: 0.85rem;">Aucun partenaire configuré</span>`;
+                } else {
+                    partners.forEach(p => {
+                        const pct = Number(p.pourcentage) || 0;
+                        const partnerShare = eqNet * (pct / 100);
+                        if (partnerShare > 0) {
+                            partnersHtml += `<div style="margin-bottom: 2px;"><span class="badge badge-warning" style="font-size: 0.8rem; font-weight: 600;">Dû à ${p.nom} (${pct}%) : ${partnerShare.toFixed(2)} €</span></div>`;
+                        } else if (partnerShare < 0) {
+                            partnersHtml += `<div style="margin-bottom: 2px;"><span class="badge badge-success" style="font-size: 0.8rem; font-weight: 600;">À percevoir de ${p.nom} (${pct}%) : ${Math.abs(partnerShare).toFixed(2)} €</span></div>`;
+                        } else {
+                            partnersHtml += `<div style="margin-bottom: 2px;"><span class="badge" style="background: rgba(255,255,255,0.05); color: var(--text-muted); font-size: 0.8rem;">${p.nom} (${pct}%) : 0.00 €</span></div>`;
+                        }
+                    });
+                }
+
+                const netColor = eqNet >= 0 ? "color: var(--secondary);" : "color: var(--danger);";
+
+                const row = document.createElement("tr");
+                row.className = "hoverable-row";
+                row.style.cursor = "pointer";
+                row.innerHTML = `
+                    <td style="font-weight: 600;">
+                        <i data-lucide="tent" style="width: 14px; height: 14px; color: var(--primary); vertical-align: middle; margin-right: 4px;"></i>
+                        ${eq.nom}
+                        <i data-lucide="info" style="width: 13px; height: 13px; color: var(--primary); opacity: 0.7; margin-left: 4px;" title="Survoler pour le détail"></i>
+                        ${eq.description ? `<div style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">${eq.description}</div>` : ''}
+                    </td>
+                    <td style="color: var(--secondary); font-weight: 600;">${eqRec.toFixed(2)} €</td>
+                    <td style="color: var(--danger); font-weight: 600;">${eqDep.toFixed(2)} €</td>
+                    <td style="${netColor} font-weight: 700; font-size: 1rem;">${eqNet.toFixed(2)} €</td>
+                    <td>${partnersHtml}</td>
+                `;
+
+                row.onmouseenter = (e) => showEquipmentDetailsPopover(e, eq, eqRec, eqDep, eqNet, eqTxList);
+                row.onmouseleave = hideEquipmentDetailsPopover;
+                row.onclick = (e) => showEquipmentDetailsPopover(e, eq, eqRec, eqDep, eqNet, eqTxList);
+
+                equipSummaryTable.appendChild(row);
+            });
+
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        if (equipHeaderTotal) {
+            equipHeaderTotal.innerText = grandTotalEquipNet.toFixed(2) + " €";
+            if (grandTotalEquipNet > 0) equipHeaderTotal.style.color = "var(--secondary)";
+            else if (grandTotalEquipNet < 0) equipHeaderTotal.style.color = "var(--danger)";
+            else equipHeaderTotal.style.color = "var(--text-main)";
         }
     }
 }
@@ -3421,6 +3525,14 @@ function populateSelectOptions() {
     STATE.produits.forEach(p => {
         txProd.innerHTML += `<option value="${p.id}">🍺 Boisson: ${p.nom_boisson}</option>`;
     });
+
+    const txEquip = document.getElementById("transaction-equipement");
+    if (txEquip) {
+        txEquip.innerHTML = `<option value="">-- Aucun (Comptabilité générale) --</option>`;
+        (STATE.sharedEquipments || []).forEach(eq => {
+            txEquip.innerHTML += `<option value="${eq.id}">🎪 Équipement: ${eq.nom}</option>`;
+        });
+    }
 
     // 3. Filter dropdowns in Accounting list
     const filterCat = document.getElementById("filter-categorie");
@@ -5689,6 +5801,266 @@ function deleteEvolutionNote(id) {
         db.collection("evolutionNotes").doc(id).delete();
     } else {
         STATE.evolutionNotes = (STATE.evolutionNotes || []).filter(item => item.id !== id);
+        saveState();
+        refreshAllViews();
+    }
+}
+
+// ============================================================================
+// --- SHARED EQUIPMENTS (INTER-ASSOCIATIONS) MODULE ---
+// ============================================================================
+function showEquipmentDetailsPopover(e, eq, recTotal, depTotal, netBalance, txList) {
+    let popover = document.getElementById("equipment-popover");
+    if (!popover) {
+        popover = document.createElement("div");
+        popover.id = "equipment-popover";
+        popover.className = "category-popover";
+        document.body.appendChild(popover);
+    }
+
+    let txRowsHtml = "";
+    if (!txList || txList.length === 0) {
+        txRowsHtml = `<div style="text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 8px;">Aucune transaction enregistrée pour cet équipement dans la période.</div>`;
+    } else {
+        txList.forEach(t => {
+            const dateStr = formatDateFrench(new Date(t.date_transaction));
+            const isRec = t.type_flux === "Recette";
+            const amtColor = isRec ? "color: #10b981;" : "color: #ef4444;";
+            const prefix = isRec ? "+" : "-";
+
+            txRowsHtml += `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.85rem;">
+                    <div>
+                        <div style="font-weight: 500; color: var(--text-main);">${t.description}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">${dateStr} • ${t.moyen_payement || 'Comptant'}</div>
+                    </div>
+                    <div style="font-weight: 700; ${amtColor} font-size: 0.9rem;">
+                        ${prefix}${Number(t.montant).toFixed(2)} €
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    let partnersBreakdownHtml = "";
+    (eq.partners || []).forEach(p => {
+        const pct = Number(p.pourcentage) || 0;
+        const share = netBalance * (pct / 100);
+        const label = share >= 0 ? `Dû à ${p.nom}` : `À percevoir de ${p.nom}`;
+        const color = share >= 0 ? "#f59e0b" : "#10b981";
+        partnersBreakdownHtml += `
+            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; padding: 3px 0; color: var(--text-muted);">
+                <span>${label} (${pct}%)</span>
+                <span style="font-weight: 700; color: ${color};">${Math.abs(share).toFixed(2)} €</span>
+            </div>
+        `;
+    });
+
+    popover.innerHTML = `
+        <div class="popover-header" style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; margin-bottom: 10px;">
+            <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                <span>🎪 ${eq.nom}</span>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+                Recettes: <strong style="color: #10b981;">${recTotal.toFixed(2)} €</strong> | Dépenses: <strong style="color: #ef4444;">${depTotal.toFixed(2)} €</strong>
+            </div>
+        </div>
+        <div style="margin-bottom: 10px;">
+            <div style="font-weight: 600; font-size: 0.8rem; color: var(--primary); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">Répartition Inter-Associations</div>
+            ${partnersBreakdownHtml}
+        </div>
+        <div style="font-weight: 600; font-size: 0.8rem; color: var(--primary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Détail des Opérations (${txList ? txList.length : 0})</div>
+        <div style="max-height: 180px; overflow-y: auto; padding-right: 4px;">
+            ${txRowsHtml}
+        </div>
+    `;
+
+    popover.style.display = "block";
+
+    const mouseX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 200);
+    const mouseY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 200);
+
+    const popoverWidth = 320;
+    const popoverHeight = popover.offsetHeight || 260;
+
+    let left = mouseX + 15;
+    let top = mouseY - 20;
+
+    if (left + popoverWidth > window.innerWidth - 10) {
+        left = mouseX - popoverWidth - 15;
+    }
+    if (top + popoverHeight > window.innerHeight - 10) {
+        top = window.innerHeight - popoverHeight - 10;
+    }
+    if (left < 10) left = 10;
+    if (top < 10) top = 10;
+
+    popover.style.left = left + "px";
+    popover.style.top = top + "px";
+}
+
+function hideEquipmentDetailsPopover() {
+    const popover = document.getElementById("equipment-popover");
+    if (popover) {
+        popover.style.display = "none";
+    }
+}
+
+function renderSettingsEquipmentsList() {
+    const listBody = document.getElementById("settings-equipments-list");
+    if (!listBody) return;
+    listBody.innerHTML = "";
+
+    const sharedEquips = STATE.sharedEquipments || [];
+    if (sharedEquips.length === 0) {
+        listBody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 24px;">Aucun équipement partagé enregistré.</td></tr>`;
+        return;
+    }
+
+    sharedEquips.forEach(eq => {
+        const partners = eq.partners || [];
+        let partnersBadges = partners.map(p => `<span class="badge badge-primary" style="margin-right: 4px; font-size: 0.8rem;">${p.nom}: ${p.pourcentage}%</span>`).join("");
+        if (!partnersBadges) partnersBadges = `<span style="color: var(--text-muted); font-size: 0.85rem;">Aucun partenaire</span>`;
+
+        listBody.innerHTML += `
+            <tr>
+                <td style="font-weight: 600;">
+                    ${eq.nom}
+                    ${eq.description ? `<div style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">${eq.description}</div>` : ''}
+                </td>
+                <td>${partnersBadges}</td>
+                <td>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-secondary btn-icon-only btn-sm" onclick="editSharedEquipment('${eq.id}')" title="Modifier">
+                            <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i>
+                        </button>
+                        <button class="btn btn-secondary btn-icon-only btn-sm" style="color: var(--danger);" onclick="deleteSharedEquipment('${eq.id}')" title="Supprimer">
+                            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function addEquipmentPartnerRow(name = "", percentage = 0) {
+    const container = document.getElementById("equipment-partners-container");
+    if (!container) return;
+
+    const rowId = "partner-row-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
+    const row = document.createElement("div");
+    row.id = rowId;
+    row.style.cssText = "display: flex; gap: 8px; align-items: center;";
+    row.innerHTML = `
+        <input type="text" class="form-control partner-name" placeholder="Nom association" value="${name}" required style="flex: 1;">
+        <div style="display: flex; align-items: center; gap: 4px; width: 100px;">
+            <input type="number" class="form-control partner-pct" placeholder="50" min="1" max="100" value="${percentage || ''}" required style="width: 70px;">
+            <span style="font-weight: 700; color: var(--text-muted);">%</span>
+        </div>
+        <button type="button" class="btn btn-secondary btn-icon-only btn-sm" style="color: var(--danger);" onclick="document.getElementById('${rowId}').remove()">
+            <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+        </button>
+    `;
+    container.appendChild(row);
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function saveSharedEquipment(e) {
+    e.preventDefault();
+    const id = document.getElementById("equipment-id").value;
+    const nom = document.getElementById("equipment-name").value.trim();
+    const description = document.getElementById("equipment-desc").value.trim();
+
+    if (!nom) return;
+
+    const container = document.getElementById("equipment-partners-container");
+    const partnerRows = container ? container.querySelectorAll("div[id^='partner-row-']") : [];
+    const partners = [];
+
+    partnerRows.forEach(row => {
+        const pName = row.querySelector(".partner-name").value.trim();
+        const pPct = Number(row.querySelector(".partner-pct").value) || 0;
+        if (pName && pPct > 0) {
+            partners.push({ nom: pName, pourcentage: pPct });
+        }
+    });
+
+    const data = {
+        nom,
+        description,
+        partners
+    };
+
+    if (dbMode === 'firebase') {
+        if (id) {
+            db.collection("sharedEquipments").doc(id).update(data)
+                .then(() => {
+                    cancelEquipmentEdit();
+                    refreshAllViews();
+                })
+                .catch(err => alert("Erreur d'enregistrement : " + err.message));
+        } else {
+            const newId = "eq-" + Date.now();
+            db.collection("sharedEquipments").doc(newId).set({ id: newId, ...data })
+                .then(() => {
+                    cancelEquipmentEdit();
+                    refreshAllViews();
+                })
+                .catch(err => alert("Erreur d'enregistrement : " + err.message));
+        }
+    } else {
+        if (id) {
+            const idx = (STATE.sharedEquipments || []).findIndex(e => e.id === id);
+            if (idx !== -1) STATE.sharedEquipments[idx] = { id, ...data };
+        } else {
+            const newId = "eq-" + Date.now();
+            if (!STATE.sharedEquipments) STATE.sharedEquipments = [];
+            STATE.sharedEquipments.push({ id: newId, ...data });
+        }
+        saveState();
+        cancelEquipmentEdit();
+        refreshAllViews();
+    }
+}
+
+function editSharedEquipment(id) {
+    const eq = (STATE.sharedEquipments || []).find(item => item.id === id);
+    if (!eq) return;
+
+    document.getElementById("equipment-id").value = eq.id;
+    document.getElementById("equipment-name").value = eq.nom;
+    document.getElementById("equipment-desc").value = eq.description || "";
+    document.getElementById("equipment-form-title").innerText = "Modifier l'Équipement Partagé";
+    document.getElementById("btn-cancel-equipment-edit").style.display = "inline-block";
+
+    const container = document.getElementById("equipment-partners-container");
+    container.innerHTML = "";
+
+    (eq.partners || []).forEach(p => {
+        addEquipmentPartnerRow(p.nom, p.pourcentage);
+    });
+}
+
+function cancelEquipmentEdit() {
+    document.getElementById("form-equipment").reset();
+    document.getElementById("equipment-id").value = "";
+    document.getElementById("equipment-form-title").innerText = "Ajouter un Équipement Partagé";
+    document.getElementById("btn-cancel-equipment-edit").style.display = "none";
+    document.getElementById("equipment-partners-container").innerHTML = "";
+}
+
+function deleteSharedEquipment(id) {
+    if (!confirm("Voulez-vous vraiment supprimer cet équipement partagé ?")) return;
+
+    if (dbMode === 'firebase') {
+        db.collection("sharedEquipments").doc(id).delete()
+            .then(() => refreshAllViews())
+            .catch(err => alert("Erreur lors de la suppression : " + err.message));
+    } else {
+        STATE.sharedEquipments = (STATE.sharedEquipments || []).filter(item => item.id !== id);
         saveState();
         refreshAllViews();
     }

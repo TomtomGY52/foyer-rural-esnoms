@@ -16,17 +16,17 @@
             errDiv.textContent += '\nError: ' + e.message + ' at ' + e.filename + ':' + e.lineno + ':' + e.colno;
         });
     </script>
-    <link rel="stylesheet" href="index.css?v=3.5">
+    <link rel="stylesheet" href="index.css?v=4.0">
     
     <!-- PWA Manifest & iOS Support -->
-    <link rel="manifest" href="manifest.json?v=3.5">
-    <link rel="apple-touch-icon" href="logo.png?v=3.5">
+    <link rel="manifest" href="manifest.json?v=4.0">
+    <link rel="apple-touch-icon" href="logo.png?v=4.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js?v=3.5')
+                navigator.serviceWorker.register('sw.js?v=4.0')
                     .then(reg => console.log('Service Worker registered successfully!', reg))
                     .catch(err => console.error('Service Worker registration failed:', err));
             });
@@ -48,7 +48,7 @@
     <div id="login-screen" style="display: none;">
         <div class="login-box">
             <div class="login-header">
-                <img src="logo.png?v=3.5" alt="Logo" class="login-logo" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px;" id="login-logo-img">
+                <img src="logo.png?v=4.0" alt="Logo" class="login-logo" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px;" id="login-logo-img">
                 <h2>Foyer Rural d'Esnoms au Val</h2>
                 <p>Espace d'Administration Sécurisé</p>
             </div>
@@ -78,7 +78,7 @@
                 <i data-lucide="menu" style="width: 20px; height: 20px;"></i>
             </button>
             <div style="display: flex; align-items: center; gap: 8px;">
-                <img id="mobile-header-logo" src="logo.png?v=3.5" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;" />
+                <img id="mobile-header-logo" src="logo.png?v=4.0" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;" />
                 <span style="font-weight: 700; font-size: 0.95rem; color: var(--text-main);">Foyer Rural</span>
             </div>
             <div style="width: 36px;"></div>
@@ -91,7 +91,7 @@
         <aside class="sidebar">
             <div class="logo-container" style="border-bottom: none; padding-bottom: 0; display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px;">
                 <div class="logo-details" style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
-                    <img id="sidebar-logo" src="logo.png?v=3.5" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
+                    <img id="sidebar-logo" src="logo.png?v=4.0" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
                     <span class="logo-title" style="white-space: nowrap;">Foyer Rural d'Esnoms au Val</span>
                 </div>
                 <!-- Sidebar Toggle Button (Inside Sidebar Logo Container) -->
@@ -497,6 +497,34 @@
                             </thead>
                             <tbody id="bilan-manifestations-summary">
                                 <!-- Dynamic manifestations breakdown -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="glass-panel" style="margin-top: 24px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h2 style="margin-bottom: 0; display: flex; align-items: center; gap: 10px;">
+                            <i data-lucide="tent" style="color: var(--primary);"></i> Équipements Partagés & Règlements Inter-Associations
+                        </h2>
+                        <span id="bilan-equipements-header-total" style="font-weight: 700; font-size: 1.25rem;">0.00 €</span>
+                    </div>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px;">
+                        Récapitulatif des recettes de location et des charges (assurances, réparations) par équipement partagé. Survolez une ligne pour consulter le détail des opérations et les montants dûs / à percevoir pour chaque association.
+                    </p>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Équipement Partagé</th>
+                                    <th>Recettes Locations</th>
+                                    <th>Dépenses / Assurance</th>
+                                    <th>Bénéfice Net</th>
+                                    <th>Répartition Inter-Associations (Dû / À recevoir)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bilan-equipements-summary">
+                                <!-- Dynamic shared equipments breakdown -->
                             </tbody>
                         </table>
                     </div>
@@ -1299,6 +1327,67 @@
                             </tbody>
                         </table>
                     </div>
+                <!-- Shared Equipments Management Panel -->
+                <div class="glass-panel" style="margin-top: 24px;">
+                    <h2 style="display: flex; align-items: center; gap: 10px;">
+                        <i data-lucide="tent" style="color: var(--primary);"></i> Gestion des Équipements Partagés (Inter-Associations)
+                    </h2>
+                    <p style="color: var(--text-muted); margin: 12px 0 20px 0; font-size: 0.9rem; line-height: 1.5;">
+                        Gérez les matériels acquis conjointement avec d'autres associations (ex: barnums, remorques, sonorisation). Indiquez la quote-part (%) de chaque association pour automatiser la répartition des recettes de location et des dépenses d'assurance.
+                    </p>
+                    
+                    <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 32px; margin-top: 20px;">
+                        <!-- List of current shared equipments -->
+                        <div>
+                            <div class="table-responsive" style="max-height: 450px; overflow-y: auto;">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Nom du Matériel</th>
+                                            <th>Associations Partenaires & Parts (%)</th>
+                                            <th style="width: 100px;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="settings-equipments-list">
+                                        <!-- Dynamic equipments list -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Add/Edit equipment form -->
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 20px; align-self: start;">
+                            <h3 id="equipment-form-title" style="font-size: 1.1rem; margin-bottom: 16px; font-weight: 600;">Ajouter un Équipement Partagé</h3>
+                            <form id="form-equipment" onsubmit="saveSharedEquipment(event)">
+                                <input type="hidden" id="equipment-id">
+                                <div class="form-group">
+                                    <label for="equipment-name">Nom de l'équipement</label>
+                                    <input type="text" id="equipment-name" placeholder="Ex: Barnum 6x12m" required style="margin-top: 4px;">
+                                </div>
+                                <div class="form-group">
+                                    <label for="equipment-desc">Description / Détails</label>
+                                    <input type="text" id="equipment-desc" placeholder="Ex: Acheté en 2024 avec le Comité des Fêtes" style="margin-top: 4px;">
+                                </div>
+                                
+                                <div class="form-group" style="margin-top: 16px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                        <label style="font-weight: 600; margin: 0;">Associations Partenaires & Parts %</label>
+                                        <button type="button" class="btn btn-secondary btn-sm" onclick="addEquipmentPartnerRow()">
+                                            <i data-lucide="plus" style="width: 12px; height: 12px;"></i> Partenaire
+                                        </button>
+                                    </div>
+                                    <div id="equipment-partners-container" style="display: flex; flex-direction: column; gap: 8px;">
+                                        <!-- Dynamic partner rows -->
+                                    </div>
+                                </div>
+                                
+                                <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px;">
+                                    <button type="button" id="btn-cancel-equipment-edit" class="btn btn-secondary" style="display: none;" onclick="cancelEquipmentEdit()">Annuler</button>
+                                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
                 </div>
             </section>
         </main>
@@ -1884,6 +1973,6 @@
     <!-- Expense Category Hover Popover -->
     <div id="expense-category-popover" class="category-popover"></div>
 
-    <script src="app.js?v=3.5"></script>
+    <script src="app.js?v=4.0"></script>
 </body>
 </html>
