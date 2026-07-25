@@ -4377,6 +4377,8 @@ function renderFeteRurale() {
     // Check if containers exist (handles cases before full HTML parse or testing)
     if (!document.getElementById("fete-stands-total-recettes")) return;
 
+    const canWriteFete = hasWritePermission("manifestations");
+
     // Filter local collections for the active manifestation
     const stands = (STATE.feteRuraleStands || []).filter(s => s.manifestation_id === activeManifestationId);
     const receipts = (STATE.feteRuraleReceipts || []).filter(r => r.manifestation_id === activeManifestationId);
@@ -4630,7 +4632,6 @@ function renderFeteRurale() {
             const standNet = standRec - Number(s.fond_de_caisse);
             const netColor = standNet > 0 ? "color: var(--secondary);" : (standNet < 0 ? "color: var(--danger);" : "");
             
-            const canWriteFete = hasWritePermission("manifestations");
             const recupererBtn = canWriteFete ? `
                         <button class="btn btn-success btn-sm" onclick="openFeteReceiptModalForStand('${s.id}')" title="Récupérer de l'argent">
                             <i data-lucide="plus" style="width: 14px; height: 14px; margin-right: 4px;"></i> Récupérer
