@@ -1841,13 +1841,6 @@ function renderBilanAnnuel() {
     const depHeaderTotal = document.getElementById("bilan-depenses-header-total");
     if (depHeaderTotal) depHeaderTotal.innerText = depTotal.toFixed(2) + " €";
 
-    let totalManifRec = 0;
-    let totalManifDep = 0;
-    Object.keys(manifTotals).forEach(id => {
-        totalManifRec += manifTotals[id].recettes;
-        totalManifDep += manifTotals[id].depenses;
-    });
-    const totalManifNet = totalManifRec - totalManifDep;
     const manifHeaderTotal = document.getElementById("bilan-manifestations-header-total");
     if (manifHeaderTotal) {
         manifHeaderTotal.innerText = totalManifNet.toFixed(2) + " €";
