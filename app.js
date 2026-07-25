@@ -1628,7 +1628,7 @@ function calcTransactionMontant() {
 
 function saveTransaction(e) {
     e.preventDefault();
-    if (!hasWritePermission("compta")) {
+    if (!hasWritePermission("comptabilite")) {
         alert("Action non autorisée (lecture seule).");
         return;
     }
@@ -1740,7 +1740,7 @@ function editTransaction(id) {
 }
 
 function deleteTransaction(id) {
-    if (!hasWritePermission("compta")) {
+    if (!hasWritePermission("comptabilite")) {
         alert("Action non autorisée (lecture seule).");
         return;
     }
@@ -2106,7 +2106,7 @@ function showManifestationDetails(id) {
 
 function saveManifestation(e) {
     e.preventDefault();
-    if (!hasWritePermission("fete-rurale")) {
+    if (!hasWritePermission("manifestations")) {
         alert("Action non autorisée (lecture seule).");
         return;
     }
@@ -2157,7 +2157,7 @@ function editManifestation(id) {
 }
 
 function deleteManifestation(id) {
-    if (!hasWritePermission("fete-rurale")) {
+    if (!hasWritePermission("manifestations")) {
         alert("Action non autorisée (lecture seule).");
         return;
     }
@@ -2256,7 +2256,7 @@ function renderProduitsList() {
 
 function saveProduit(e) {
     e.preventDefault();
-    if (!hasWritePermission("boissons")) {
+    if (!hasWritePermission("reserve")) {
         alert("Action non autorisée (lecture seule).");
         return;
     }
@@ -2307,7 +2307,7 @@ function editProduit(id) {
 }
 
 function deleteProduit(id) {
-    if (!hasWritePermission("boissons")) {
+    if (!hasWritePermission("reserve")) {
         alert("Action non autorisée (lecture seule).");
         return;
     }
@@ -2379,7 +2379,7 @@ function calcInventoryDiff(id) {
 
 function saveInventoryAdjustments(e) {
     e.preventDefault();
-    if (!hasWritePermission("boissons")) {
+    if (!hasWritePermission("reserve")) {
         alert("Action non autorisée (lecture seule).");
         return;
     }
@@ -2724,7 +2724,7 @@ function selectNote(id) {
 }
 
 function createNewNote() {
-    if (!hasWritePermission("meetings")) {
+    if (!hasWritePermission("notes")) {
         alert("Action non autorisée (lecture seule).");
         return;
     }
@@ -2742,7 +2742,7 @@ function createNewNote() {
 }
 
 function editNote(id) {
-    if (!hasWritePermission("meetings")) {
+    if (!hasWritePermission("notes")) {
         alert("Action non autorisée (lecture seule).");
         return;
     }
@@ -2774,7 +2774,7 @@ function cancelNoteEdit() {
 }
 
 function saveNote() {
-    if (!hasWritePermission("meetings")) {
+    if (!hasWritePermission("notes")) {
         alert("Action non autorisée (lecture seule).");
         return;
     }
@@ -2824,7 +2824,7 @@ function saveNote() {
 }
 
 function deleteNote(id) {
-    if (!hasWritePermission("meetings")) {
+    if (!hasWritePermission("notes")) {
         alert("Action non autorisée (lecture seule).");
         return;
     }
@@ -3863,7 +3863,7 @@ function editFeteStand(id) {
 
 function saveFeteStand(e) {
     e.preventDefault();
-    if (!hasWritePermission("fete-rurale")) {
+    if (!hasWritePermission("manifestations")) {
         alert("Action non autorisée (lecture seule).");
         return;
     }
@@ -3881,7 +3881,7 @@ function saveFeteStand(e) {
 }
 
 function deleteFeteStand(id) {
-    if (!hasWritePermission("fete-rurale")) {
+    if (!hasWritePermission("manifestations")) {
         alert("Action non autorisée (lecture seule).");
         return;
     }
@@ -3948,7 +3948,7 @@ function editFeteReceipt(id) {
 
 function saveFeteReceipt(e) {
     e.preventDefault();
-    if (!hasWritePermission("fete-rurale")) {
+    if (!hasWritePermission("manifestations")) {
         alert("Action non autorisée (lecture seule).");
         return;
     }
@@ -3997,7 +3997,7 @@ function saveFeteReceipt(e) {
 }
 
 function deleteFeteReceipt(id) {
-    if (!hasWritePermission("fete-rurale")) {
+    if (!hasWritePermission("manifestations")) {
         alert("Action non autorisée (lecture seule).");
         return;
     }
@@ -4056,7 +4056,7 @@ function editFeteExpense(id) {
 
 function saveFeteExpense(e) {
     e.preventDefault();
-    if (!hasWritePermission("fete-rurale")) {
+    if (!hasWritePermission("manifestations")) {
         alert("Action non autorisée (lecture seule).");
         return;
     }
@@ -4159,7 +4159,7 @@ function saveFeteExpense(e) {
 }
 
 function deleteFeteExpense(id) {
-    if (!hasWritePermission("fete-rurale")) {
+    if (!hasWritePermission("manifestations")) {
         alert("Action non autorisée (lecture seule).");
         return;
     }
@@ -4213,7 +4213,7 @@ function editFetePartner(id) {
 
 function saveFetePartner(e) {
     e.preventDefault();
-    if (!hasWritePermission("fete-rurale")) {
+    if (!hasWritePermission("manifestations")) {
         alert("Action non autorisée (lecture seule).");
         return;
     }
@@ -4286,7 +4286,7 @@ function saveFetePartner(e) {
 }
 
 function deleteFetePartner(id) {
-    if (!hasWritePermission("fete-rurale")) {
+    if (!hasWritePermission("manifestations")) {
         alert("Action non autorisée (lecture seule).");
         return;
     }
@@ -4969,13 +4969,53 @@ function hasWritePermission(tabId) {
     if (dbMode !== 'firebase') return true;
     const profile = STATE.currentUserProfile;
     if (!profile) return true; // Master admin has full access
-    const perm = profile.permissions ? (profile.permissions[tabId] || "lecture/ecriture") : "lecture/ecriture";
+    const perm = getPermForTab(profile, tabId);
     return perm === "lecture/ecriture";
+}
+
+// Map to handle legacy permission keys stored under old names
+const PERM_KEY_ALIASES = {
+    "compta": "comptabilite",
+    "fete-rurale": "manifestations",
+    "boissons": "reserve",
+    "meetings": "notes"
+};
+
+function getPermForTab(profile, tabId) {
+    if (!profile || !profile.permissions) return "lecture/ecriture";
+    if (profile.permissions[tabId] !== undefined) return profile.permissions[tabId];
+    
+    // Check canonical target key if tabId is a legacy key
+    const canonicalKey = PERM_KEY_ALIASES[tabId];
+    if (canonicalKey && profile.permissions[canonicalKey] !== undefined) {
+        return profile.permissions[canonicalKey];
+    }
+    
+    // Check legacy source key if tabId is a canonical key
+    for (const [oldKey, newKey] of Object.entries(PERM_KEY_ALIASES)) {
+        if (newKey === tabId && profile.permissions[oldKey] !== undefined) {
+            return profile.permissions[oldKey];
+        }
+    }
+    return "lecture/ecriture";
 }
 
 function applyPermissionsToUI() {
     const profile = STATE.currentUserProfile;
-    const tabs = ["dashboard", "adherents", "tennis", "compta", "bilan", "fete-rurale", "boissons", "investissements", "meetings"];
+    // Real sidebar tab IDs (excluding settings which is admin-only)
+    const tabs = ["dashboard", "adherents", "tennis", "comptabilite", "bilan", "manifestations", "reserve", "investissements", "notes"];
+    
+    // Update sidebar profile name display
+    const profileNameSpan = document.getElementById("sidebar-profile-name");
+    if (profileNameSpan) {
+        if (profile && profile.name) {
+            profileNameSpan.innerText = profile.name + " — ";
+        } else if (dbMode === 'firebase' && firebase.auth().currentUser) {
+            profileNameSpan.innerText = "Admin — ";
+        } else {
+            profileNameSpan.innerText = "";
+        }
+    }
     
     // Master admin or local mode: restore everything
     if (!profile || dbMode !== 'firebase') {
@@ -4997,6 +5037,10 @@ function applyPermissionsToUI() {
             }
         });
         
+        // Show settings tab for admin
+        const settingsLink = document.querySelector('.nav-item[data-tab="settings"]');
+        if (settingsLink) settingsLink.parentElement.style.display = "";
+        
         const adminOnlyPanels = document.querySelectorAll("#tab-settings .glass-panel");
         adminOnlyPanels.forEach(panel => {
             panel.style.display = "";
@@ -5004,9 +5048,13 @@ function applyPermissionsToUI() {
         return;
     }
     
-    // Restricted profile: hide tabs and buttons
+    // Restricted profile: hide settings tab entirely
+    const settingsLink = document.querySelector('.nav-item[data-tab="settings"]');
+    if (settingsLink) settingsLink.parentElement.style.display = "none";
+    
+    // Restricted profile: hide/show tabs and buttons
     tabs.forEach(tabId => {
-        const perm = profile.permissions ? (profile.permissions[tabId] || "lecture/ecriture") : "lecture/ecriture";
+        const perm = getPermForTab(profile, tabId);
         
         // Hide/show sidebar links
         const link = document.querySelector(`.nav-item[data-tab="${tabId}"]`);
@@ -5073,25 +5121,16 @@ function applyPermissionsToUI() {
         }
     });
     
-    // Hide administrative panels in settings tab
-    const adminOnlyPanels = document.querySelectorAll("#tab-settings .glass-panel");
-    adminOnlyPanels.forEach(panel => {
-        if (panel.innerHTML.includes("Version &amp; Dernières Modifications") || panel.innerHTML.includes("Version & Dernières Modifications")) {
-            panel.style.display = "";
-        } else {
-            panel.style.display = "none";
-        }
-    });
-    
     // Redirect active masked tab to first visible tab
     const activeTabPane = document.querySelector(".tab-pane.active");
     if (activeTabPane) {
         const activeTabId = activeTabPane.id.replace("tab-", "");
-        const perm = profile.permissions ? (profile.permissions[activeTabId] || "lecture/ecriture") : "lecture/ecriture";
-        if (perm === "masqué") {
+        const perm = getPermForTab(profile, activeTabId);
+        if (perm === "masqué" || activeTabId === "settings") {
             const firstVisibleLink = Array.from(document.querySelectorAll(".nav-item")).find(link => {
                 const tId = link.getAttribute("data-tab");
-                const p = profile.permissions ? (profile.permissions[tId] || "lecture/ecriture") : "lecture/ecriture";
+                if (tId === "settings") return false;
+                const p = getPermForTab(profile, tId);
                 return p !== "masqué";
             });
             if (firstVisibleLink) {
@@ -5154,7 +5193,7 @@ function editUserProfile(id) {
     
     document.querySelectorAll(".profile-perm-select").forEach(sel => {
         const tab = sel.getAttribute("data-tab");
-        sel.value = p.permissions ? (p.permissions[tab] || "lecture/ecriture") : "lecture/ecriture";
+        sel.value = getPermForTab(p, tab);
     });
 }
 
