@@ -1474,3 +1474,37 @@ tr:hover td {
     }
 }
 
+/* Print styles for Inter-Association Invoice Modal */
+@media print {
+    body * {
+        visibility: hidden !important;
+    }
+    #modal-partner-invoice, #modal-partner-invoice * {
+        visibility: visible !important;
+    }
+    #modal-partner-invoice {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        background: white !important;
+        color: #0f172a !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+    }
+    #modal-partner-invoice .modal-content {
+        border: none !important;
+        background: white !important;
+        color: #0f172a !important;
+        box-shadow: none !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 0 !important;
+    }
+    #modal-partner-invoice .modal-footer, 
+    #modal-partner-invoice .modal-close {
+        display: none !important;
+    }
+}
+

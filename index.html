@@ -16,17 +16,17 @@
             errDiv.textContent += '\nError: ' + e.message + ' at ' + e.filename + ':' + e.lineno + ':' + e.colno;
         });
     </script>
-    <link rel="stylesheet" href="index.css?v=4.4">
+    <link rel="stylesheet" href="index.css?v=4.5">
     
     <!-- PWA Manifest & iOS Support -->
-    <link rel="manifest" href="manifest.json?v=4.4">
-    <link rel="apple-touch-icon" href="logo.png?v=4.4">
+    <link rel="manifest" href="manifest.json?v=4.5">
+    <link rel="apple-touch-icon" href="logo.png?v=4.5">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js?v=4.4')
+                navigator.serviceWorker.register('sw.js?v=4.5')
                     .then(reg => console.log('Service Worker registered successfully!', reg))
                     .catch(err => console.error('Service Worker registration failed:', err));
             });
@@ -48,7 +48,7 @@
     <div id="login-screen" style="display: none;">
         <div class="login-box">
             <div class="login-header">
-                <img src="logo.png?v=4.4" alt="Logo" class="login-logo" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px;" id="login-logo-img">
+                <img src="logo.png?v=4.5" alt="Logo" class="login-logo" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px;" id="login-logo-img">
                 <h2>Foyer Rural d'Esnoms au Val</h2>
                 <p>Espace d'Administration Sécurisé</p>
             </div>
@@ -78,7 +78,7 @@
                 <i data-lucide="menu" style="width: 20px; height: 20px;"></i>
             </button>
             <div style="display: flex; align-items: center; gap: 8px;">
-                <img id="mobile-header-logo" src="logo.png?v=4.4" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;" />
+                <img id="mobile-header-logo" src="logo.png?v=4.5" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;" />
                 <span style="font-weight: 700; font-size: 0.95rem; color: var(--text-main);">Foyer Rural</span>
             </div>
             <div style="width: 36px;"></div>
@@ -91,7 +91,7 @@
         <aside class="sidebar">
             <div class="logo-container" style="border-bottom: none; padding-bottom: 0; display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px;">
                 <div class="logo-details" style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
-                    <img id="sidebar-logo" src="logo.png?v=4.4" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
+                    <img id="sidebar-logo" src="logo.png?v=4.5" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
                     <span class="logo-title" style="white-space: nowrap;">Foyer Rural d'Esnoms au Val</span>
                 </div>
                 <!-- Sidebar Toggle Button (Inside Sidebar Logo Container) -->
@@ -528,6 +528,7 @@
                                     <th>Quote-part Recettes</th>
                                     <th>Quote-part Dépenses</th>
                                     <th>Solde Règlement (Dû / À percevoir)</th>
+                                    <th style="width: 160px; text-align: center;">Document Officiel</th>
                                 </tr>
                             </thead>
                             <tbody id="bilan-equipements-summary">
@@ -1345,28 +1346,59 @@
                         <i data-lucide="building-2" style="color: var(--primary);"></i> Gestion des Associations Partenaires
                     </h2>
                     <p style="color: var(--text-muted); margin: 12px 0 20px 0; font-size: 0.9rem; line-height: 1.5;">
-                        Enregistrez la liste des associations partenaires avec lesquelles vous partagez des équipements. Elles seront sélectionnables dans la liste déroulante lors de la création d'un équipement partagé.
+                        Enregistrez les coordonnées des associations partenaires (responsable, adresse, email, N° RNA/SIRET). Ces informations seront utilisées sur les décomptes et factures officielles d'inter-associations.
                     </p>
                     
-                    <form id="form-partner-assoc" onsubmit="savePartnerAssociation(event)" style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
-                        <input type="text" id="partner-assoc-name" class="form-control" placeholder="Ex: Comité des Fêtes" style="flex: 1; min-width: 250px;" required>
-                        <button type="submit" class="btn btn-primary">
-                            <i data-lucide="plus"></i> Ajouter l'association
-                        </button>
-                    </form>
+                    <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 32px; margin-top: 20px;">
+                        <!-- List of partner associations -->
+                        <div>
+                            <div class="table-responsive" style="max-height: 450px; overflow-y: auto;">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Association</th>
+                                            <th>Contact & Coordonnées</th>
+                                            <th style="width: 100px;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="settings-partner-assocs-list">
+                                        <!-- Dynamic partner associations list -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
 
-                    <div class="table-responsive">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Nom de l'Association</th>
-                                    <th style="width: 100px;">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="settings-partner-assocs-list">
-                                <!-- Dynamic partner associations list -->
-                            </tbody>
-                        </table>
+                        <!-- Add/Edit Partner Association form -->
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 20px; align-self: start;">
+                            <h3 id="partner-assoc-form-title" style="font-size: 1.1rem; margin-bottom: 16px; font-weight: 600;">Ajouter une Association</h3>
+                            <form id="form-partner-assoc" onsubmit="savePartnerAssociation(event)">
+                                <input type="hidden" id="partner-assoc-id">
+                                <div class="form-group">
+                                    <label for="partner-assoc-name">Nom de l'Association</label>
+                                    <input type="text" id="partner-assoc-name" placeholder="Ex: Comité des Fêtes d'Esnoms" required style="margin-top: 4px;">
+                                </div>
+                                <div class="form-group">
+                                    <label for="partner-assoc-contact">Responsable / Contact</label>
+                                    <input type="text" id="partner-assoc-contact" placeholder="Ex: M. Jean Lefèvre (Président)" style="margin-top: 4px;">
+                                </div>
+                                <div class="form-group">
+                                    <label for="partner-assoc-adresse">Adresse Postale</label>
+                                    <input type="text" id="partner-assoc-adresse" placeholder="Ex: 1 Place de la Mairie, 52190 Esnoms-au-Val" style="margin-top: 4px;">
+                                </div>
+                                <div class="form-group">
+                                    <label for="partner-assoc-email">Email / Téléphone</label>
+                                    <input type="text" id="partner-assoc-email" placeholder="Ex: contact@comite-esnoms.fr / 06 12 34 56 78" style="margin-top: 4px;">
+                                </div>
+                                <div class="form-group">
+                                    <label for="partner-assoc-siret">N° RNA / SIRET (Optionnel)</label>
+                                    <input type="text" id="partner-assoc-siret" placeholder="Ex: W521001234" style="margin-top: 4px;">
+                                </div>
+                                <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px;">
+                                    <button type="button" id="btn-cancel-partner-assoc-edit" class="btn btn-secondary" style="display: none;" onclick="cancelPartnerAssocEdit()">Annuler</button>
+                                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 </div>
 
@@ -2023,9 +2055,28 @@
         </div>
     </div>
 
+    <!-- MODAL: INTER-ASSOCIATION PARTNER INVOICE / STATEMENT -->
+    <div id="modal-partner-invoice" class="modal-overlay">
+        <div class="modal-content" style="max-width: 850px;">
+            <div class="modal-header">
+                <h2>Décompte Officiel Inter-Association (Facture / Attestation)</h2>
+                <button class="modal-close" onclick="closeModal('modal-partner-invoice')">&times;</button>
+            </div>
+            <div id="partner-invoice-printable-content" class="invoice-printable" style="padding: 24px; background: rgba(255,255,255,0.03); border-radius: var(--border-radius); font-size: 0.9rem;">
+                <!-- Dynamic Invoice Content generated by JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-partner-invoice')">Fermer</button>
+                <button type="button" class="btn btn-primary" onclick="window.print()">
+                    <i data-lucide="printer"></i> Imprimer / Exporter en PDF
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Expense Category Hover Popover -->
     <div id="expense-category-popover" class="category-popover"></div>
 
-    <script src="app.js?v=4.4"></script>
+    <script src="app.js?v=4.5"></script>
 </body>
 </html>

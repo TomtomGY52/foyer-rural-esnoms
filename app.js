@@ -2149,22 +2149,25 @@ function renderBilanAnnuel() {
 
                 const row = document.createElement("tr");
                 row.className = "hoverable-row";
-                row.style.cursor = "pointer";
                 row.innerHTML = `
-                    <td style="font-weight: 700; font-size: 0.95rem;">
+                    <td style="font-weight: 700; font-size: 0.95rem; cursor: pointer;">
                         <i data-lucide="building-2" style="width: 15px; height: 15px; color: var(--primary); vertical-align: middle; margin-right: 6px;"></i>
                         ${assoc.nom}
                         <i data-lucide="info" style="width: 13px; height: 13px; color: var(--primary); opacity: 0.7; margin-left: 4px;" title="Survoler pour le détail"></i>
                     </td>
-                    <td>${eqBadges}</td>
-                    <td style="color: var(--secondary); font-weight: 600;">${assoc.totalRec.toFixed(2)} €</td>
-                    <td style="color: var(--danger); font-weight: 600;">${assoc.totalDep.toFixed(2)} €</td>
-                    <td>${statusBadge}</td>
+                    <td style="cursor: pointer;">${eqBadges}</td>
+                    <td style="color: var(--secondary); font-weight: 600; cursor: pointer;">${assoc.totalRec.toFixed(2)} €</td>
+                    <td style="color: var(--danger); font-weight: 600; cursor: pointer;">${assoc.totalDep.toFixed(2)} €</td>
+                    <td style="cursor: pointer;">${statusBadge}</td>
+                    <td style="text-align: center;">
+                        <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); generatePartnerInvoice('${assoc.nom.replace(/'/g, "\\'")}')" title="Éditer la Facture / Décompte Officiel" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; padding: 6px 12px; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); color: var(--primary); font-weight: 600;">
+                            <i data-lucide="file-text" style="width: 14px; height: 14px;"></i> Facture / Décompte
+                        </button>
+                    </td>
                 `;
 
                 row.onmouseenter = (e) => showAssociationDetailsPopover(e, assoc);
                 row.onmouseleave = hideEquipmentDetailsPopover;
-                row.onclick = (e) => showAssociationDetailsPopover(e, assoc);
 
                 equipSummaryTable.appendChild(row);
             });
@@ -6101,21 +6104,34 @@ function renderSettingsPartnerAssocsList() {
 
     const assocs = STATE.partnerAssociations || [];
     if (assocs.length === 0) {
-        listBody.innerHTML = `<tr><td colspan="2" style="text-align: center; color: var(--text-muted); padding: 20px;">Aucune association partenaire enregistrée.</td></tr>`;
+        listBody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 20px;">Aucune association partenaire enregistrée.</td></tr>`;
         return;
     }
 
     assocs.forEach(a => {
+        let detailsHtml = "";
+        if (a.contact) detailsHtml += `<div>👤 <strong>Contact:</strong> ${a.contact}</div>`;
+        if (a.adresse) detailsHtml += `<div style="font-size: 0.78rem; color: var(--text-muted);">📍 ${a.adresse}</div>`;
+        if (a.email) detailsHtml += `<div style="font-size: 0.78rem; color: var(--text-muted);">✉️ ${a.email}</div>`;
+        if (a.siret) detailsHtml += `<div style="font-size: 0.75rem; color: var(--primary);">N° ${a.siret}</div>`;
+        if (!detailsHtml) detailsHtml = `<span style="color: var(--text-muted); font-size: 0.82rem;">Aucune coordonnée renseignée</span>`;
+
         listBody.innerHTML += `
             <tr>
-                <td style="font-weight: 600;">
+                <td style="font-weight: 700;">
                     <i data-lucide="building-2" style="width: 14px; height: 14px; color: var(--primary); vertical-align: middle; margin-right: 6px;"></i>
                     ${a.nom}
                 </td>
+                <td style="font-size: 0.85rem;">${detailsHtml}</td>
                 <td>
-                    <button class="btn btn-secondary btn-icon-only btn-sm" style="color: var(--danger);" onclick="deletePartnerAssociation('${a.id}')" title="Supprimer">
-                        <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
-                    </button>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-secondary btn-icon-only btn-sm" onclick="editPartnerAssociation('${a.id}')" title="Modifier les coordonnées">
+                            <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i>
+                        </button>
+                        <button class="btn btn-secondary btn-icon-only btn-sm" style="color: var(--danger);" onclick="deletePartnerAssociation('${a.id}')" title="Supprimer">
+                            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                        </button>
+                    </div>
                 </td>
             </tr>
         `;
@@ -6124,29 +6140,59 @@ function renderSettingsPartnerAssocsList() {
     if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
+function editPartnerAssociation(id) {
+    const a = (STATE.partnerAssociations || []).find(x => x.id === id);
+    if (!a) return;
+
+    document.getElementById("partner-assoc-id").value = a.id;
+    document.getElementById("partner-assoc-name").value = a.nom;
+    document.getElementById("partner-assoc-contact").value = a.contact || "";
+    document.getElementById("partner-assoc-adresse").value = a.adresse || "";
+    document.getElementById("partner-assoc-email").value = a.email || "";
+    document.getElementById("partner-assoc-siret").value = a.siret || "";
+
+    const titleEl = document.getElementById("partner-assoc-form-title");
+    if (titleEl) titleEl.innerText = "Modifier l'Association Partenaire";
+    const cancelBtn = document.getElementById("btn-cancel-partner-assoc-edit");
+    if (cancelBtn) cancelBtn.style.display = "inline-block";
+}
+
+function cancelPartnerAssocEdit() {
+    document.getElementById("form-partner-assoc").reset();
+    document.getElementById("partner-assoc-id").value = "";
+    const titleEl = document.getElementById("partner-assoc-form-title");
+    if (titleEl) titleEl.innerText = "Ajouter une Association";
+    const cancelBtn = document.getElementById("btn-cancel-partner-assoc-edit");
+    if (cancelBtn) cancelBtn.style.display = "none";
+}
+
 function savePartnerAssociation(e) {
     e.preventDefault();
-    const input = document.getElementById("partner-assoc-name");
-    const nom = input ? input.value.trim() : "";
+    const id = document.getElementById("partner-assoc-id").value || "assoc-" + Date.now();
+    const nom = document.getElementById("partner-assoc-name").value.trim();
+    const contact = document.getElementById("partner-assoc-contact") ? document.getElementById("partner-assoc-contact").value.trim() : "";
+    const adresse = document.getElementById("partner-assoc-adresse") ? document.getElementById("partner-assoc-adresse").value.trim() : "";
+    const email = document.getElementById("partner-assoc-email") ? document.getElementById("partner-assoc-email").value.trim() : "";
+    const siret = document.getElementById("partner-assoc-siret") ? document.getElementById("partner-assoc-siret").value.trim() : "";
+
     if (!nom) return;
 
-    const newAssoc = {
-        id: "assoc-" + Date.now(),
-        nom
-    };
+    const assocData = { id, nom, contact, adresse, email, siret };
 
     if (dbMode === 'firebase') {
-        db.collection("partnerAssociations").doc(newAssoc.id).set(newAssoc)
+        db.collection("partnerAssociations").doc(id).set(assocData)
             .then(() => {
-                input.value = "";
+                cancelPartnerAssocEdit();
                 refreshAllViews();
             })
             .catch(err => alert("Erreur d'enregistrement : " + err.message));
     } else {
         if (!STATE.partnerAssociations) STATE.partnerAssociations = [];
-        STATE.partnerAssociations.push(newAssoc);
+        const index = STATE.partnerAssociations.findIndex(x => x.id === id);
+        if (index >= 0) STATE.partnerAssociations[index] = assocData;
+        else STATE.partnerAssociations.push(assocData);
         saveState();
-        input.value = "";
+        cancelPartnerAssocEdit();
         refreshAllViews();
     }
 }
@@ -6163,6 +6209,222 @@ function deletePartnerAssociation(id) {
         saveState();
         refreshAllViews();
     }
+}
+
+function generatePartnerInvoice(assocName) {
+    const assocInfo = (STATE.partnerAssociations || []).find(a => (a.nom || "").trim().toLowerCase() === assocName.trim().toLowerCase()) || {
+        nom: assocName,
+        contact: "Président / Trésorier",
+        adresse: "Non renseignée",
+        email: "Non renseigné",
+        siret: "N/A"
+    };
+
+    const currentYear = STATE.currentPeriod || new Date().getFullYear();
+    const todayStr = formatDateFrench(new Date());
+
+    const sharedEquips = STATE.sharedEquipments || [];
+    let equipmentsBreakdown = [];
+    let allTxList = [];
+    let totalAssocRec = 0;
+    let totalAssocDep = 0;
+    let totalAssocNet = 0;
+
+    sharedEquips.forEach(eq => {
+        let eqRec = 0;
+        let eqDep = 0;
+        let eqTxList = [];
+
+        STATE.transactions.forEach(t => {
+            if (t.equipement_id === eq.id && t.paye && isDateInPeriod(t.date_transaction, STATE.currentPeriod)) {
+                const amt = Number(t.montant) || 0;
+                eqTxList.push(t);
+                if (t.type_flux === "Recette") {
+                    eqRec += amt;
+                } else {
+                    eqDep += amt;
+                }
+            }
+        });
+
+        const eqNet = eqRec - eqDep;
+        const partner = (eq.partners || []).find(p => (p.nom || "").trim().toLowerCase() === assocName.trim().toLowerCase());
+
+        if (partner) {
+            const pct = Number(partner.pourcentage) || 0;
+            const pRec = eqRec * (pct / 100);
+            const pDep = eqDep * (pct / 100);
+            const pNet = eqNet * (pct / 100);
+
+            totalAssocRec += pRec;
+            totalAssocDep += pDep;
+            totalAssocNet += pNet;
+
+            equipmentsBreakdown.push({
+                eqNom: eq.nom,
+                eqDesc: eq.description,
+                pct,
+                eqRec,
+                eqDep,
+                eqNet,
+                pRec,
+                pDep,
+                pNet
+            });
+
+            eqTxList.forEach(t => {
+                if (!allTxList.some(x => x.id === t.id)) {
+                    allTxList.push({ ...t, eqNom: eq.nom, pct });
+                }
+            });
+        }
+    });
+
+    let eqRowsHtml = "";
+    equipmentsBreakdown.forEach(item => {
+        const netColor = item.pNet >= 0 ? "#d97706" : "#059669";
+        const label = item.pNet >= 0 ? "Dû" : "À percevoir";
+        eqRowsHtml += `
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 10px; font-weight: 600; color: #0f172a;">🎪 ${item.eqNom} ${item.eqDesc ? `<br><small style="color: #64748b; font-weight: normal;">${item.eqDesc}</small>` : ''}</td>
+                <td style="padding: 10px; text-align: center; font-weight: 700; color: #475569;">${item.pct}%</td>
+                <td style="padding: 10px; text-align: right; color: #059669; font-weight: 600;">${item.eqRec.toFixed(2)} €</td>
+                <td style="padding: 10px; text-align: right; color: #dc2626; font-weight: 600;">${item.eqDep.toFixed(2)} €</td>
+                <td style="padding: 10px; text-align: right; font-weight: 700; color: #0f172a;">${item.eqNet.toFixed(2)} €</td>
+                <td style="padding: 10px; text-align: right; font-weight: 700; color: ${netColor};">${label}: ${Math.abs(item.pNet).toFixed(2)} €</td>
+            </tr>
+        `;
+    });
+
+    let txRowsHtml = "";
+    if (allTxList.length === 0) {
+        txRowsHtml = `<tr><td colspan="6" style="padding: 12px; text-align: center; color: #64748b;">Aucune opération enregistrée sur cet exercice.</td></tr>`;
+    } else {
+        allTxList.forEach(t => {
+            const dateStr = formatDateFrench(new Date(t.date_transaction));
+            const isRec = t.type_flux === "Recette";
+            const amtColor = isRec ? "#059669" : "#dc2626";
+            const prefix = isRec ? "+" : "-";
+            const shareAmt = Number(t.montant) * (t.pct / 100);
+
+            txRowsHtml += `
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                    <td style="padding: 8px 10px; color: #475569;">${dateStr}</td>
+                    <td style="padding: 8px 10px; font-weight: 500; color: #0f172a;">${t.description}</td>
+                    <td style="padding: 8px 10px; color: #64748b;">${t.eqNom} (${t.pct}%)</td>
+                    <td style="padding: 8px 10px; text-align: center;"><span style="font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; background: ${isRec ? '#d1fae5' : '#fee2e2'}; color: ${isRec ? '#065f46' : '#991b1b'}; font-weight: 600;">${t.type_flux}</span></td>
+                    <td style="padding: 8px 10px; text-align: right; font-weight: 600; color: ${amtColor};">${prefix}${Number(t.montant).toFixed(2)} €</td>
+                    <td style="padding: 8px 10px; text-align: right; font-weight: 700; color: #0f172a;">${prefix}${shareAmt.toFixed(2)} €</td>
+                </tr>
+            `;
+        });
+    }
+
+    const docTypeLabel = totalAssocNet >= 0 ? "ATTESTATION & DÉCOMPTE DE REVERSEMENT" : "FACTURE & APPEL DE FONDS INTER-ASSOCIATIONS";
+    const statusBoxBg = totalAssocNet >= 0 ? "#fef3c7" : "#d1fae5";
+    const statusBoxBorder = totalAssocNet >= 0 ? "#f59e0b" : "#10b981";
+    const statusBoxTextColor = totalAssocNet >= 0 ? "#92400e" : "#065f46";
+    const statusTextHeader = totalAssocNet >= 0 ? `SOLDE NET À REVERSER À L'ASSOCIATION : ${totalAssocNet.toFixed(2)} €` : `SOLDE NET DÛ AU FOYER RURAL : ${Math.abs(totalAssocNet).toFixed(2)} €`;
+
+    const htmlContent = `
+        <div style="background: white; color: #0f172a; padding: 28px; border-radius: 8px; font-family: system-ui, -apple-system, sans-serif;">
+            <!-- Header -->
+            <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #4338ca; padding-bottom: 16px; margin-bottom: 20px;">
+                <div>
+                    <h1 style="color: #4338ca; margin: 0; font-size: 1.4rem; font-weight: 800;">FOYER RURAL D'ESNOMS AU VAL</h1>
+                    <div style="font-size: 0.85rem; color: #475569; margin-top: 4px;">
+                        Place de la Mairie, 52190 Esnoms-au-Val<br>
+                        Email : foyer.rural.esnoms@gmail.com
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 1rem; font-weight: 800; color: #1e1b4b; text-transform: uppercase;">${docTypeLabel}</div>
+                    <div style="font-size: 0.85rem; color: #64748b; margin-top: 4px;">
+                        Réf : <strong>FAC-INTER-${currentYear}-${(assocInfo.nom || assocName).replace(/\s+/g, '-').toUpperCase()}</strong><br>
+                        Date d'émission : <strong>${todayStr}</strong><br>
+                        Exercice comptable : <strong>${currentYear}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recipient Box -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 20px;">
+                <div style="font-size: 0.72rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Association Partenaire Destinataire</div>
+                <div style="font-size: 1.05rem; font-weight: 700; color: #0f172a;">🏢 ${assocInfo.nom || assocName}</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; font-size: 0.82rem; color: #334155;">
+                    <div>👤 <strong>Contact :</strong> ${assocInfo.contact || "Non renseigné"}</div>
+                    <div>✉️ <strong>Email / Tél :</strong> ${assocInfo.email || "Non renseigné"}</div>
+                    <div>📍 <strong>Adresse :</strong> ${assocInfo.adresse || "Non renseignée"}</div>
+                    <div>🏢 <strong>SIRET / RNA :</strong> ${assocInfo.siret || "N/A"}</div>
+                </div>
+            </div>
+
+            <!-- Section 1 -->
+            <h3 style="font-size: 0.95rem; color: #1e1b4b; margin-bottom: 10px; font-weight: 700;">1. Récapitulatif par Équipement Partagé (Période : ${currentYear})</h3>
+            
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.82rem;">
+                <thead>
+                    <tr style="background: #f1f5f9; color: #334155; text-align: left;">
+                        <th style="padding: 8px; border-bottom: 2px solid #cbd5e1;">Équipement</th>
+                        <th style="padding: 8px; text-align: center; border-bottom: 2px solid #cbd5e1;">Quote-part</th>
+                        <th style="padding: 8px; text-align: right; border-bottom: 2px solid #cbd5e1;">Total Recettes</th>
+                        <th style="padding: 8px; text-align: right; border-bottom: 2px solid #cbd5e1;">Total Dépenses</th>
+                        <th style="padding: 8px; text-align: right; border-bottom: 2px solid #cbd5e1;">Net Matériel</th>
+                        <th style="padding: 8px; text-align: right; border-bottom: 2px solid #cbd5e1;">Part Partenaire</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${eqRowsHtml}
+                </tbody>
+            </table>
+
+            <!-- Section 2 -->
+            <h3 style="font-size: 0.95rem; color: #1e1b4b; margin-bottom: 10px; font-weight: 700;">2. Journal Détaillé des Opérations Comptables Rattachées</h3>
+
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.78rem;">
+                <thead>
+                    <tr style="background: #f1f5f9; color: #334155; text-align: left;">
+                        <th style="padding: 6px 8px; border-bottom: 2px solid #cbd5e1;">Date</th>
+                        <th style="padding: 6px 8px; border-bottom: 2px solid #cbd5e1;">Libellé / Opération</th>
+                        <th style="padding: 6px 8px; border-bottom: 2px solid #cbd5e1;">Équipement</th>
+                        <th style="padding: 6px 8px; text-align: center; border-bottom: 2px solid #cbd5e1;">Flux</th>
+                        <th style="padding: 6px 8px; text-align: right; border-bottom: 2px solid #cbd5e1;">Montant Total</th>
+                        <th style="padding: 6px 8px; text-align: right; border-bottom: 2px solid #cbd5e1;">Quote-part Partenaire</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${txRowsHtml}
+                </tbody>
+            </table>
+
+            <!-- Summary Status Box -->
+            <div style="background: ${statusBoxBg}; border: 2px solid ${statusBoxBorder}; border-radius: 8px; padding: 16px; text-align: center; margin-bottom: 28px;">
+                <div style="font-size: 1.15rem; font-weight: 800; color: ${statusBoxTextColor}; margin-bottom: 4px;">
+                    ${statusTextHeader}
+                </div>
+                <div style="font-size: 0.82rem; color: ${statusBoxTextColor};">
+                    ${totalAssocNet >= 0 ? "Document justificatif de recette à valoir pour la comptabilité de l'association partenaire." : "Document valant facture et pièce justificative de dépense pour la comptabilité de l'association partenaire."}
+                </div>
+            </div>
+
+            <!-- Signatures area -->
+            <div style="display: flex; justify-content: space-between; margin-top: 30px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 0.82rem; color: #475569;">
+                <div>
+                    <strong>Pour le Foyer Rural d'Esnoms au Val</strong><br>
+                    Le Trésorier / Le Président<br>
+                    <small>Signature & Cachet</small>
+                </div>
+                <div style="text-align: right;">
+                    <strong>Pour l'Association Partenaire</strong><br>
+                    ${assocInfo.nom || assocName}<br>
+                    <small>Signature & Mention "Bon pour accord"</small>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById("partner-invoice-printable-content").innerHTML = htmlContent;
+    openModal("modal-partner-invoice");
 }
 
 function hideEquipmentDetailsPopover() {
