@@ -4372,6 +4372,78 @@ function deleteFetePartner(id) {
     });
 }
 
+// --- FETE RURALE CATEGORY EXPENSES POPOVER ---
+function showCategoryExpensesPopover(e, categoryName) {
+    const popover = document.getElementById("expense-category-popover");
+    if (!popover) return;
+    
+    const itemsMap = STATE.currentManifCategoryExpenses || {};
+    const items = itemsMap[categoryName] || [];
+    
+    if (items.length === 0) return;
+    
+    let totalAmt = 0;
+    let listHtml = "";
+    
+    items.forEach(item => {
+        totalAmt += Number(item.montant) || 0;
+        const dateStr = item.date && item.date !== "--" ? formatDateFrench(new Date(item.date)) : "--";
+        const paidBadge = item.paye ? 
+            `<span style="color: #34d399; font-weight: 600;">Payé</span>` : 
+            `<span style="color: #fbbf24; font-weight: 600;">À payer</span>`;
+            
+        listHtml += `
+            <div class="category-popover-item">
+                <div class="category-popover-item-header">
+                    <span>${item.description}</span>
+                    <span style="color: #f87171;">${Number(item.montant).toFixed(2)} €</span>
+                </div>
+                <div class="category-popover-item-sub">
+                    <span>Payé à : ${item.paye_a || '--'} (${dateStr})</span>
+                    <span>${paidBadge}</span>
+                </div>
+            </div>
+        `;
+    });
+    
+    popover.innerHTML = `
+        <div class="category-popover-header">
+            <div class="category-popover-title">📂 ${categoryName} (${items.length})</div>
+            <div class="category-popover-total">${totalAmt.toFixed(2)} €</div>
+        </div>
+        <div class="category-popover-list">
+            ${listHtml}
+        </div>
+    `;
+    
+    // Position popover near mouse or target element
+    const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 200);
+    const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 200);
+    
+    let top = clientY - 10;
+    let left = clientX - 340;
+    if (left < 10) {
+        left = clientX + 20;
+    }
+    if (left + 330 > window.innerWidth) {
+        left = Math.max(10, window.innerWidth - 340);
+    }
+    if (top + 280 > window.innerHeight) {
+        top = Math.max(10, window.innerHeight - 290);
+    }
+    
+    popover.style.left = left + "px";
+    popover.style.top = top + "px";
+    popover.classList.add("active");
+}
+
+function hideCategoryExpensesPopover() {
+    const popover = document.getElementById("expense-category-popover");
+    if (popover) {
+        popover.classList.remove("active");
+    }
+}
+
 // --- FETE RURALE RENDERER ---
 function renderFeteRurale() {
     // Check if containers exist (handles cases before full HTML parse or testing)
@@ -4443,11 +4515,37 @@ function renderFeteRurale() {
         }
     });
 
+    let totalDepItemsMap = {};
+
+    if (totalFondsDeCaisse > 0) {
+        const label = "Fonds de caisse (Stands)";
+        if (!totalDepItemsMap[label]) totalDepItemsMap[label] = [];
+        stands.forEach(s => {
+            if (Number(s.fond_de_caisse) > 0) {
+                totalDepItemsMap[label].push({
+                    date: "--",
+                    description: `Fond de caisse : ${s.nom}`,
+                    montant: Number(s.fond_de_caisse),
+                    paye_a: "Stands manifestation",
+                    paye: true
+                });
+            }
+        });
+    }
+
     // 4. Expenses specific to this manifestation (resolving category name)
     expenses.forEach(e => {
         const cat = STATE.categories.find(c => c.id === e.categorie);
         const label = cat ? cat.libelle : (e.categorie ? e.categorie.charAt(0).toUpperCase() + e.categorie.slice(1) : "Autre");
         totalDepList[label] = (totalDepList[label] || 0) + Number(e.montant);
+        if (!totalDepItemsMap[label]) totalDepItemsMap[label] = [];
+        totalDepItemsMap[label].push({
+            date: e.date,
+            description: e.description,
+            montant: Number(e.montant),
+            paye_a: e.paye_a || "--",
+            paye: e.paye
+        });
         grandTotalDep += Number(e.montant);
     });
 
@@ -4459,10 +4557,20 @@ function renderFeteRurale() {
                 const cat = STATE.categories.find(c => c.id === t.categorie_id);
                 const label = cat ? cat.libelle : "Autre dépense";
                 totalDepList[label] = (totalDepList[label] || 0) + Number(t.montant);
+                if (!totalDepItemsMap[label]) totalDepItemsMap[label] = [];
+                totalDepItemsMap[label].push({
+                    date: t.date_transaction,
+                    description: t.description,
+                    montant: Number(t.montant),
+                    paye_a: "Comptabilité générale",
+                    paye: t.paye
+                });
                 grandTotalDep += Number(t.montant);
             }
         }
     });
+
+    STATE.currentManifCategoryExpenses = totalDepItemsMap;
 
     // Render Dashboard Cards
     const dashRec = document.getElementById("manif-dash-total-recettes");
@@ -4510,13 +4618,18 @@ function renderFeteRurale() {
             dashDepBody.innerHTML = `<tr><td colspan="2" style="text-align: center; color: var(--text-muted); padding: 12px;">Aucune dépense</td></tr>`;
         } else {
             keys.forEach(k => {
+                const safeKey = k.replace(/'/g, "\\'");
                 dashDepBody.innerHTML += `
-                    <tr>
-                        <td style="font-weight: 500;">${k}</td>
+                    <tr class="category-expense-row" style="cursor: pointer;" onmouseenter="showCategoryExpensesPopover(event, '${safeKey}')" onmouseleave="hideCategoryExpensesPopover()" onclick="showCategoryExpensesPopover(event, '${safeKey}')">
+                        <td style="font-weight: 500; display: flex; align-items: center; justify-content: space-between;">
+                            <span>${k}</span>
+                            <i data-lucide="info" style="width: 14px; height: 14px; color: var(--primary); opacity: 0.8; margin-left: 6px;"></i>
+                        </td>
                         <td style="text-align: right; font-weight: 600; color: var(--danger);">${totalDepList[k].toFixed(2)} €</td>
                     </tr>
                 `;
             });
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
     }
 
@@ -4579,6 +4692,17 @@ function renderFeteRurale() {
                                     const val = context.raw || 0;
                                     const percentage = ((val / grandTotalDep) * 100).toFixed(0);
                                     return ` ${context.label}: ${val.toFixed(2)} € (${percentage}%)`;
+                                },
+                                afterBody: function(context) {
+                                    if (!context || !context[0]) return [];
+                                    const label = context[0].label;
+                                    const items = (STATE.currentManifCategoryExpenses || {})[label] || [];
+                                    if (items.length === 0) return [];
+                                    const lines = ["", "Détails :"];
+                                    items.forEach(item => {
+                                        lines.push(`• ${item.description}: ${Number(item.montant).toFixed(2)} € (${item.paye_a || '--'})`);
+                                    });
+                                    return lines;
                                 }
                             }
                         }
