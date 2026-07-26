@@ -6234,7 +6234,7 @@ function generatePartnerInvoice(assocName) {
 
     const currentYear = STATE.currentPeriod || new Date().getFullYear();
     const todayStr = formatDateFrench(new Date());
-    const logoSrc = STATE.logoBase64 || 'logo.png';
+    const logoSrc = localStorage.getItem("foyer_logo_url") || 'logo.png';
 
     const sharedEquips = STATE.sharedEquipments || [];
     let equipmentsBreakdown = [];
