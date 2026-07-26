@@ -3138,6 +3138,60 @@ function generateInvoiceFromTransaction(txId) {
 let currentInvoiceTx = null;
 let currentInvoiceCustomer = null;
 
+function getEmitterInfo() {
+    const saved = localStorage.getItem("foyer_emitter_info");
+    if (saved) {
+        try {
+            return JSON.parse(saved);
+        } catch(e) {}
+    }
+    return STATE.emitterInfo || {
+        nom: "Foyer Rural d'Esnoms au Val",
+        status: "Association Loi 1901 à but non lucratif",
+        adresse: "Place de la Mairie, 52190 Esnoms-au-Val",
+        email: "foyer.rural.esnoms@gmail.com",
+        phone: "03 25 XX XX XX",
+        siret: "W521001234",
+        iban: "FR76 XXXX XXXX XXXX XXXX XXXX XXX"
+    };
+}
+
+function initEmitterSettings() {
+    const info = getEmitterInfo();
+    if (document.getElementById("emitter-name")) document.getElementById("emitter-name").value = info.nom || "";
+    if (document.getElementById("emitter-status")) document.getElementById("emitter-status").value = info.status || "";
+    if (document.getElementById("emitter-adresse")) document.getElementById("emitter-adresse").value = info.adresse || "";
+    if (document.getElementById("emitter-email")) document.getElementById("emitter-email").value = info.email || "";
+    if (document.getElementById("emitter-phone")) document.getElementById("emitter-phone").value = info.phone || "";
+    if (document.getElementById("emitter-siret")) document.getElementById("emitter-siret").value = info.siret || "";
+    if (document.getElementById("emitter-iban")) document.getElementById("emitter-iban").value = info.iban || "";
+}
+
+function saveInvoiceEmitterSettings(e) {
+    e.preventDefault();
+    const info = {
+        nom: document.getElementById("emitter-name").value.trim(),
+        status: document.getElementById("emitter-status").value.trim(),
+        adresse: document.getElementById("emitter-adresse").value.trim(),
+        email: document.getElementById("emitter-email").value.trim(),
+        phone: document.getElementById("emitter-phone").value.trim(),
+        siret: document.getElementById("emitter-siret").value.trim(),
+        iban: document.getElementById("emitter-iban").value.trim()
+    };
+
+    STATE.emitterInfo = info;
+    localStorage.setItem("foyer_emitter_info", JSON.stringify(info));
+
+    if (dbMode === 'firebase') {
+        db.collection("settings").doc("emitter").set(info)
+            .then(() => alert("Coordonnées de l'émetteur enregistrées avec succès !"))
+            .catch(err => alert("Erreur d'enregistrement : " + err.message));
+    } else {
+        saveState();
+        alert("Coordonnées de l'émetteur enregistrées avec succès !");
+    }
+}
+
 function buildAndShowInvoice(customer, tx) {
     currentInvoiceTx = tx;
     currentInvoiceCustomer = customer;
@@ -3148,89 +3202,129 @@ function buildAndShowInvoice(customer, tx) {
     const uPrice = Number(tx.prix || tx.montant || 0).toFixed(2);
     const totalAmount = Number(qty * uPrice).toFixed(2);
     
+    const emitter = getEmitterInfo();
+    const logoUrl = localStorage.getItem("foyer_logo_url") || 'logo.png';
+    const isPaid = tx.paye;
+    
     const invoiceHtml = `
-        <div class="invoice-header" style="border-bottom: 2px solid var(--primary); padding-bottom: 16px; margin-bottom: 24px; display: flex; justify-content: space-between;">
-            <div class="invoice-logo-area" style="text-align: left;">
-                <h1 style="color: var(--primary); font-size: 1.6rem; font-weight: 700; margin-bottom: 4px;">FOYER RURAL</h1>
-                <p style="color: #475569; font-size: 0.8rem;">Association Loi 1901 à but non lucratif</p>
-                <p style="color: #475569; font-size: 0.8rem;">12 Rue du Petit Foyer, 34000 Village-sur-Tennis</p>
-                <p style="color: #475569; font-size: 0.8rem;">Email: contact@foyerrural.org</p>
-            </div>
-            <div class="invoice-meta" style="text-align: right;">
-                <h2 style="font-size: 1.25rem; font-weight: 700; color: #0f172a; margin-bottom: 4px;">FACTURE</h2>
-                <p style="font-size: 0.8rem; color: #475569;"><strong>N° Facture :</strong> ${invoiceNum}</p>
-                <p style="font-size: 0.8rem; color: #475569;"><strong>Date d'émission :</strong> ${invoiceDate}</p>
-                <p style="font-size: 0.8rem; color: #475569;"><strong>Statut :</strong> ${tx.paye ? "PAYÉ" : "EN ATTENTE DE PAIEMENT"}</p>
-            </div>
-        </div>
-        
-        <div class="invoice-addresses" style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 24px;">
-            <div class="invoice-address-block" style="text-align: left;">
-                <h3 style="font-size: 0.8rem; text-transform: uppercase; color: #475569; margin-bottom: 6px; font-weight: 600; letter-spacing: 0.5px;">Émetteur</h3>
-                <p style="font-size: 0.9rem; color: #1e293b; line-height: 1.5;"><strong>Foyer Rural de l'Association</strong></p>
-                <p style="font-size: 0.9rem; color: #1e293b; line-height: 1.5;">Trésorerie générale</p>
-                <p style="font-size: 0.9rem; color: #1e293b; line-height: 1.5;">Village-sur-Tennis, France</p>
-            </div>
-            <div class="invoice-address-block" style="text-align: left;">
-                <h3 style="font-size: 0.8rem; text-transform: uppercase; color: #475569; margin-bottom: 6px; font-weight: 600; letter-spacing: 0.5px;">Facturé à</h3>
-                <div style="display: flex; gap: 4px; margin-bottom: 4px;">
-                    <input type="text" id="invoice-edit-customer-prenom" value="${customer.prenom || ''}" placeholder="Prénom" style="border: 1px dashed #cbd5e1; background: transparent; padding: 2px 4px; font-weight: 600; font-family: inherit; font-size: 0.9rem; width: 90px;" />
-                    <input type="text" id="invoice-edit-customer-nom" value="${customer.nom || ''}" placeholder="Nom" style="border: 1px dashed #cbd5e1; background: transparent; padding: 2px 4px; font-weight: 600; font-family: inherit; font-size: 0.9rem; width: 110px;" />
+        <div style="background: white; color: #0f172a; padding: 24px; border-radius: 8px; font-family: system-ui, -apple-system, sans-serif;">
+            <!-- Header with Logo and Emitter Info -->
+            <div style="border-bottom: 2px solid #4338ca; padding-bottom: 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <img src="${logoUrl}" alt="Logo" style="max-height: 65px; max-width: 130px; object-fit: contain;">
+                    <div>
+                        <input type="text" id="invoice-edit-emitter-name" value="${emitter.nom}" placeholder="Nom de l'Association" style="font-size: 1.2rem; font-weight: 800; color: #4338ca; border: 1px dashed #cbd5e1; background: transparent; padding: 2px 4px; width: 310px;" />
+                        <div>
+                            <input type="text" id="invoice-edit-emitter-status" value="${emitter.status}" placeholder="Mention légale" style="font-size: 0.8rem; color: #475569; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; width: 290px; margin-top: 2px;" />
+                        </div>
+                        <div>
+                            <input type="text" id="invoice-edit-emitter-adresse" value="${emitter.adresse}" placeholder="Adresse postale" style="font-size: 0.8rem; color: #475569; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; width: 290px; margin-top: 2px;" />
+                        </div>
+                        <div>
+                            <input type="text" id="invoice-edit-emitter-email" value="${emitter.email}" placeholder="Email" style="font-size: 0.8rem; color: #475569; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; width: 190px; margin-top: 2px;" />
+                            <input type="text" id="invoice-edit-emitter-phone" value="${emitter.phone}" placeholder="Tél" style="font-size: 0.8rem; color: #475569; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; width: 110px; margin-top: 2px;" />
+                        </div>
+                    </div>
                 </div>
-                <div style="margin-bottom: 4px;">
-                    <input type="text" id="invoice-edit-customer-email" value="${customer.email || ''}" placeholder="Email" style="border: 1px dashed #cbd5e1; background: transparent; padding: 2px 4px; font-family: inherit; font-size: 0.85rem; width: 200px;" />
+                <div style="text-align: right;">
+                    <h2 style="font-size: 1.25rem; font-weight: 800; color: #1e1b4b; margin: 0 0 6px 0;">FACTURE</h2>
+                    <div style="font-size: 0.82rem; color: #475569; margin-bottom: 2px;">
+                        <strong>N° Facture :</strong> <input type="text" id="invoice-edit-num" value="${invoiceNum}" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 700; width: 140px; text-align: right; padding: 1px 4px;" />
+                    </div>
+                    <div style="font-size: 0.82rem; color: #475569; margin-bottom: 2px;">
+                        <strong>Date :</strong> <input type="text" id="invoice-edit-date" value="${invoiceDate}" style="border: 1px dashed #cbd5e1; background: transparent; width: 110px; text-align: right; padding: 1px 4px;" />
+                    </div>
+                    <div style="font-size: 0.82rem; color: #475569; margin-top: 4px;">
+                        <strong>Statut :</strong>
+                        <select id="invoice-edit-status" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 700; color: ${isPaid ? '#059669' : '#d97706'}; padding: 2px 4px; font-size: 0.8rem;">
+                            <option value="PAYÉ" ${isPaid ? "selected" : ""}>PAYÉ</option>
+                            <option value="EN ATTENTE DE PAIEMENT" ${!isPaid ? "selected" : ""}>EN ATTENTE DE PAIEMENT</option>
+                        </select>
+                    </div>
                 </div>
-                <p style="font-size: 0.85rem; color: #475569; margin-top: 4px;">Date d'adhésion: ${customer.date_adhesion ? formatDateFrench(new Date(customer.date_adhesion)) : '--'}</p>
             </div>
-        </div>
-        
-        <table class="invoice-table" style="width: 100%; margin-bottom: 24px; border-collapse: collapse;">
-            <thead>
-                <tr style="background-color: #f8fafc;">
-                    <th style="text-align: left; padding: 10px; border-bottom: 2px solid #e2e8f0; color: #475569;">Description de la Prestation</th>
-                    <th style="text-align: center; width: 100px; padding: 10px; border-bottom: 2px solid #e2e8f0; color: #475569;">Quantité</th>
-                    <th style="text-align: right; width: 120px; padding: 10px; border-bottom: 2px solid #e2e8f0; color: #475569;">Prix Unitaire (€)</th>
-                    <th style="text-align: right; width: 120px; padding: 10px; border-bottom: 2px solid #e2e8f0; color: #475569;">Total H.T. (€)</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">
-                        <input type="text" id="invoice-edit-desc" value="${tx.description}" style="border: 1px dashed #cbd5e1; background: transparent; padding: 4px; font-family: inherit; font-size: 0.9rem; width: 100%;" oninput="updateInvoiceTotalsRealTime()" />
-                    </td>
-                    <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: center;">
-                        <input type="number" id="invoice-edit-qty" value="${qty}" min="1" style="border: 1px dashed #cbd5e1; background: transparent; padding: 4px; font-family: inherit; font-size: 0.9rem; text-align: center; width: 70px;" oninput="updateInvoiceTotalsRealTime()" />
-                    </td>
-                    <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right;">
-                        <input type="number" id="invoice-edit-price" value="${uPrice}" min="0" step="0.01" style="border: 1px dashed #cbd5e1; background: transparent; padding: 4px; font-family: inherit; font-size: 0.9rem; text-align: right; width: 90px;" oninput="updateInvoiceTotalsRealTime()" />
-                    </td>
-                    <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 600;" id="invoice-total-ht-cell">
-                        ${totalAmount} €
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-        
-        <div class="invoice-totals" style="display: flex; justify-content: flex-end; margin-bottom: 32px;">
-            <table class="invoice-totals-table" style="width: 220px; border-collapse: collapse;">
-                <tr>
-                    <td style="text-align: left; font-weight: 600; padding: 6px 10px;">Total Net H.T.</td>
-                    <td style="text-align: right; padding: 6px 10px;" id="invoice-total-net-ht-cell">${totalAmount} €</td>
-                </tr>
-                <tr>
-                    <td style="text-align: left; font-weight: 600; padding: 6px 10px;">TVA (Exonéré)</td>
-                    <td style="text-align: right; padding: 6px 10px;">0.00 €</td>
-                </tr>
-                <tr class="grand-total" style="border-top: 2px solid var(--primary); font-weight: 700; color: #0f172a;">
-                    <td style="text-align: left; padding: 6px 10px;">NET À PAYER TTC</td>
-                    <td style="text-align: right; padding: 6px 10px;" id="invoice-total-net-ttc-cell">${totalAmount} €</td>
-                </tr>
+            
+            <!-- Address Blocks -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px;">
+                <div>
+                    <h3 style="font-size: 0.72rem; text-transform: uppercase; color: #64748b; margin-bottom: 6px; font-weight: 700; letter-spacing: 0.5px;">Émetteur (Trésorerie)</h3>
+                    <div style="font-size: 0.9rem; font-weight: 700; color: #0f172a;">${emitter.nom}</div>
+                    <div style="font-size: 0.82rem; color: #475569; margin-top: 2px;">${emitter.adresse}</div>
+                    <div style="font-size: 0.82rem; color: #475569;">Email : ${emitter.email} • Tél : ${emitter.phone}</div>
+                    <div>
+                        <input type="text" id="invoice-edit-emitter-siret" value="${emitter.siret}" placeholder="SIRET / RNA" style="border: 1px dashed #cbd5e1; background: transparent; font-size: 0.78rem; color: #64748b; margin-top: 2px; width: 220px;" />
+                    </div>
+                </div>
+                <div>
+                    <h3 style="font-size: 0.72rem; text-transform: uppercase; color: #64748b; margin-bottom: 6px; font-weight: 700; letter-spacing: 0.5px;">Facturé à (Client / Adhérent)</h3>
+                    <div style="display: flex; gap: 4px; margin-bottom: 4px;">
+                        <input type="text" id="invoice-edit-customer-prenom" value="${customer.prenom || ''}" placeholder="Prénom" style="border: 1px dashed #cbd5e1; background: transparent; padding: 2px 4px; font-weight: 700; font-family: inherit; font-size: 0.95rem; width: 110px;" />
+                        <input type="text" id="invoice-edit-customer-nom" value="${customer.nom || ''}" placeholder="Nom" style="border: 1px dashed #cbd5e1; background: transparent; padding: 2px 4px; font-weight: 700; font-family: inherit; font-size: 0.95rem; width: 140px;" />
+                    </div>
+                    <div style="margin-bottom: 4px;">
+                        <input type="text" id="invoice-edit-customer-email" value="${customer.email || ''}" placeholder="Adresse e-mail" style="border: 1px dashed #cbd5e1; background: transparent; padding: 2px 4px; font-family: inherit; font-size: 0.83rem; width: 230px;" />
+                    </div>
+                    <div style="font-size: 0.82rem; color: #64748b;">
+                        Date d'adhésion / Enregistrement : ${customer.date_adhesion ? formatDateFrench(new Date(customer.date_adhesion)) : '--'}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Table: Prestation details -->
+            <table style="width: 100%; margin-bottom: 24px; border-collapse: collapse; font-size: 0.85rem;">
+                <thead>
+                    <tr style="background-color: #f1f5f9; color: #334155; text-align: left;">
+                        <th style="padding: 10px; border-bottom: 2px solid #cbd5e1;">Description de la Prestation / Produit</th>
+                        <th style="text-align: center; width: 100px; padding: 10px; border-bottom: 2px solid #cbd5e1;">Quantité</th>
+                        <th style="text-align: right; width: 130px; padding: 10px; border-bottom: 2px solid #cbd5e1;">Prix Unitaire (€)</th>
+                        <th style="text-align: right; width: 130px; padding: 10px; border-bottom: 2px solid #cbd5e1;">Total H.T. (€)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">
+                            <input type="text" id="invoice-edit-desc" value="${tx.description}" style="border: 1px dashed #cbd5e1; background: transparent; padding: 6px; font-family: inherit; font-size: 0.9rem; width: 100%; font-weight: 500;" oninput="updateInvoiceTotalsRealTime()" />
+                        </td>
+                        <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: center;">
+                            <input type="number" id="invoice-edit-qty" value="${qty}" min="1" style="border: 1px dashed #cbd5e1; background: transparent; padding: 6px; font-family: inherit; font-size: 0.9rem; text-align: center; width: 70px; font-weight: 700;" oninput="updateInvoiceTotalsRealTime()" />
+                        </td>
+                        <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right;">
+                            <input type="number" id="invoice-edit-price" value="${uPrice}" min="0" step="0.01" style="border: 1px dashed #cbd5e1; background: transparent; padding: 6px; font-family: inherit; font-size: 0.9rem; text-align: right; width: 95px; font-weight: 700;" oninput="updateInvoiceTotalsRealTime()" />
+                        </td>
+                        <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 700; color: #0f172a;" id="invoice-total-ht-cell">
+                            ${totalAmount} €
+                        </td>
+                    </tr>
+                </tbody>
             </table>
-        </div>
-        
-        <div class="invoice-footer" style="border-top: 1px solid #e2e8f0; padding-top: 16px; text-align: center; font-size: 0.75rem; color: #94a3b8;">
-            <p>TVA non applicable, art. 293 B du CGI. Association sans but lucratif.</p>
-            <p>Merci pour votre soutien et votre participation active à la vie du Foyer Rural !</p>
+            
+            <!-- Totals Box -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px;">
+                <div style="max-width: 320px; font-size: 0.8rem; color: #475569;">
+                    <div style="font-weight: 700; color: #1e1b4b; margin-bottom: 4px;">Règlement par virement bancaire :</div>
+                    <input type="text" id="invoice-edit-emitter-iban" value="${emitter.iban}" placeholder="IBAN & BIC" style="border: 1px dashed #cbd5e1; background: transparent; padding: 2px 4px; font-size: 0.78rem; width: 100%; font-family: monospace;" />
+                </div>
+                <table style="width: 240px; border-collapse: collapse; font-size: 0.85rem;">
+                    <tr>
+                        <td style="text-align: left; font-weight: 600; padding: 6px 10px; color: #475569;">Total H.T.</td>
+                        <td style="text-align: right; padding: 6px 10px; font-weight: 600; color: #0f172a;" id="invoice-total-net-ht-cell">${totalAmount} €</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left; font-weight: 600; padding: 6px 10px; color: #475569;">TVA (Non applicable)</td>
+                        <td style="text-align: right; padding: 6px 10px; color: #64748b;">0.00 €</td>
+                    </tr>
+                    <tr style="border-top: 2px solid #4338ca; font-weight: 800; color: #0f172a; font-size: 0.95rem;">
+                        <td style="text-align: left; padding: 8px 10px;">TOTAL TTC</td>
+                        <td style="text-align: right; padding: 8px 10px; color: #4338ca;" id="invoice-total-net-ttc-cell">${totalAmount} €</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <!-- Footer -->
+            <div style="border-top: 1px solid #e2e8f0; padding-top: 14px; text-align: center; font-size: 0.75rem; color: #64748b;">
+                <div>TVA non applicable, art. 293 B du CGI. Association à but non lucratif.</div>
+                <div style="margin-top: 4px;">Merci pour votre soutien et votre confiance envers le Foyer Rural !</div>
+            </div>
         </div>
     `;
     
@@ -3279,6 +3373,28 @@ function saveInvoiceEdits() {
     const qty = qtyInput ? (Number(qtyInput.value) || 1) : 1;
     const price = priceInput ? (Number(priceInput.value) || 0) : 0;
     const total = qty * price;
+
+    const statusSelect = document.getElementById("invoice-edit-status");
+    const isPaid = statusSelect ? statusSelect.value === "PAYÉ" : currentInvoiceTx.paye;
+    
+    // Save Emitter info if edited on invoice
+    const eName = document.getElementById("invoice-edit-emitter-name");
+    if (eName) {
+        const info = {
+            nom: eName.value.trim(),
+            status: document.getElementById("invoice-edit-emitter-status") ? document.getElementById("invoice-edit-emitter-status").value.trim() : "",
+            adresse: document.getElementById("invoice-edit-emitter-adresse") ? document.getElementById("invoice-edit-emitter-adresse").value.trim() : "",
+            email: document.getElementById("invoice-edit-emitter-email") ? document.getElementById("invoice-edit-emitter-email").value.trim() : "",
+            phone: document.getElementById("invoice-edit-emitter-phone") ? document.getElementById("invoice-edit-emitter-phone").value.trim() : "",
+            siret: document.getElementById("invoice-edit-emitter-siret") ? document.getElementById("invoice-edit-emitter-siret").value.trim() : "",
+            iban: document.getElementById("invoice-edit-emitter-iban") ? document.getElementById("invoice-edit-emitter-iban").value.trim() : ""
+        };
+        STATE.emitterInfo = info;
+        localStorage.setItem("foyer_emitter_info", JSON.stringify(info));
+        if (dbMode === 'firebase') {
+            db.collection("settings").doc("emitter").set(info).catch(err => console.error(err));
+        }
+    }
     
     // 1. Update customer if linked to adherent
     if (currentInvoiceTx.adherent_id) {
@@ -3288,7 +3404,6 @@ function saveInvoiceEdits() {
             a.nom = nom;
             a.email = email;
             
-            // Save adherent changes
             if (dbMode === 'firebase') {
                 db.collection("adherents").doc(a.id).set(a).catch(err => console.error(err));
             }
@@ -3297,25 +3412,25 @@ function saveInvoiceEdits() {
     
     // 2. Update transaction
     if (currentInvoiceTx.id.startsWith("tx-temp-")) {
-        // Convert to a real transaction and push to state
         currentInvoiceTx.id = "tx-" + Date.now();
         currentInvoiceTx.description = desc;
         currentInvoiceTx.quantite = qty;
         currentInvoiceTx.prix = price;
         currentInvoiceTx.montant = total;
+        currentInvoiceTx.paye = isPaid;
         STATE.transactions.push(currentInvoiceTx);
         
         if (dbMode === 'firebase') {
             db.collection("transactions").doc(currentInvoiceTx.id).set(currentInvoiceTx).catch(err => console.error(err));
         }
     } else {
-        // Update existing transaction
         const tx = STATE.transactions.find(t => t.id === currentInvoiceTx.id);
         if (tx) {
             tx.description = desc;
             tx.quantite = qty;
             tx.prix = price;
             tx.montant = total;
+            tx.paye = isPaid;
             
             if (dbMode === 'firebase') {
                 db.collection("transactions").doc(tx.id).set(tx).catch(err => console.error(err));
@@ -5253,6 +5368,9 @@ function initLogo() {
     if (cotInput) {
         cotInput.value = getCotisationAmount();
     }
+    
+    // Initialize emitter settings
+    initEmitterSettings();
 }
 
 function renderLogo(logoUrl, opacity) {

@@ -1474,15 +1474,16 @@ tr:hover td {
     }
 }
 
-/* Print styles for Inter-Association Invoice Modal */
+/* Print styles for Invoice Modals */
 @media print {
     body * {
         visibility: hidden !important;
     }
-    #modal-partner-invoice, #modal-partner-invoice * {
+    #modal-partner-invoice, #modal-partner-invoice *,
+    #modal-invoice, #modal-invoice * {
         visibility: visible !important;
     }
-    #modal-partner-invoice {
+    #modal-partner-invoice, #modal-invoice {
         position: absolute !important;
         left: 0 !important;
         top: 0 !important;
@@ -1493,7 +1494,8 @@ tr:hover td {
         box-shadow: none !important;
         padding: 0 !important;
     }
-    #modal-partner-invoice .modal-content {
+    #modal-partner-invoice .modal-content,
+    #modal-invoice .modal-content {
         border: none !important;
         background: white !important;
         color: #0f172a !important;
@@ -1503,8 +1505,18 @@ tr:hover td {
         padding: 0 !important;
     }
     #modal-partner-invoice .modal-footer, 
-    #modal-partner-invoice .modal-close {
+    #modal-partner-invoice .modal-close,
+    #modal-invoice .modal-footer,
+    #modal-invoice .modal-close {
         display: none !important;
+    }
+    #modal-invoice input, #modal-invoice textarea, #modal-invoice select {
+        border: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        outline: none !important;
+        padding: 0 !important;
+        appearance: none !important;
     }
 }
 
