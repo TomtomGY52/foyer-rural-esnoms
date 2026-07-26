@@ -16,17 +16,17 @@
             errDiv.textContent += '\nError: ' + e.message + ' at ' + e.filename + ':' + e.lineno + ':' + e.colno;
         });
     </script>
-    <link rel="stylesheet" href="index.css?v=5.5">
+    <link rel="stylesheet" href="index.css?v=5.6">
     
     <!-- PWA Manifest & iOS Support -->
-    <link rel="manifest" href="manifest.json?v=5.5">
-    <link rel="apple-touch-icon" href="logo.png?v=5.5">
+    <link rel="manifest" href="manifest.json?v=5.6">
+    <link rel="apple-touch-icon" href="logo.png?v=5.6">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js?v=5.5')
+                navigator.serviceWorker.register('sw.js?v=5.6')
                     .then(reg => console.log('Service Worker registered successfully!', reg))
                     .catch(err => console.error('Service Worker registration failed:', err));
             });
@@ -35,7 +35,7 @@
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Lucide Icons (Local Bundle) -->
-    <script src="lucide.min.js?v=5.5"></script>
+    <script src="lucide.min.js?v=5.6"></script>
     <!-- Firebase Compat SDKs (allows running from file:// without CORS module issues) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -48,7 +48,7 @@
     <div id="login-screen" style="display: none;">
         <div class="login-box">
             <div class="login-header">
-                <img src="logo.png?v=5.5" alt="Logo" class="login-logo" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px;" id="login-logo-img">
+                <img src="logo.png?v=5.6" alt="Logo" class="login-logo" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px;" id="login-logo-img">
                 <h2>Foyer Rural d'Esnoms au Val</h2>
                 <p>Espace d'Administration Sécurisé</p>
             </div>
@@ -78,7 +78,7 @@
                 <i data-lucide="menu" style="width: 20px; height: 20px;"></i>
             </button>
             <div style="display: flex; align-items: center; gap: 8px;">
-                <img id="mobile-header-logo" src="logo.png?v=5.5" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;" />
+                <img id="mobile-header-logo" src="logo.png?v=5.6" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;" />
                 <span style="font-weight: 700; font-size: 0.95rem; color: var(--text-main);">Foyer Rural</span>
             </div>
             <div style="width: 36px;"></div>
@@ -91,7 +91,7 @@
         <aside class="sidebar">
             <div class="logo-container" style="border-bottom: none; padding-bottom: 0; display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px;">
                 <div class="logo-details" style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
-                    <img id="sidebar-logo" src="logo.png?v=5.5" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
+                    <img id="sidebar-logo" src="logo.png?v=5.6" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
                     <span class="logo-title" style="white-space: nowrap;">Foyer Rural d'Esnoms au Val</span>
                 </div>
                 <!-- Sidebar Toggle Button (Inside Sidebar Logo Container) -->
@@ -1602,12 +1602,23 @@
                     </div>
                     <div class="form-group">
                         <label for="transaction-moyen">Moyen de Paiement</label>
-                        <select id="transaction-moyen" required>
+                        <select id="transaction-moyen" onchange="toggleChequeFields('transaction')" required>
                             <option value="Espèces">Espèces</option>
                             <option value="Chèque">Chèque</option>
                             <option value="Carte Bancaire">Carte Bancaire</option>
                             <option value="Virement">Virement</option>
                         </select>
+                    </div>
+                </div>
+
+                <div id="transaction-cheque-group" class="form-row" style="display: none; background: rgba(99, 102, 241, 0.05); padding: 12px; border-radius: var(--border-radius); border: 1px dashed var(--primary); margin-bottom: 15px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="transaction-num-cheque">N° de Chèque</label>
+                        <input type="text" id="transaction-num-cheque" placeholder="Ex: 1234567">
+                    </div>
+                    <div class="form-group checkbox-group" style="margin-top: 20px;">
+                        <input type="checkbox" id="transaction-cheque-encaisse">
+                        <label for="transaction-cheque-encaisse" style="margin-bottom: 0; cursor: pointer; font-weight: 600; color: var(--success);">Chèque Encaissé / Débité</label>
                     </div>
                 </div>
 
@@ -1796,6 +1807,28 @@
                             <option value="Occasion">Occasion</option>
                             <option value="Hors service">Hors service</option>
                         </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="invest-moyen">Moyen de Paiement</label>
+                        <select id="invest-moyen" onchange="toggleChequeFields('invest')" required>
+                            <option value="Virement">Virement</option>
+                            <option value="Chèque">Chèque</option>
+                            <option value="Carte Bancaire">Carte Bancaire</option>
+                            <option value="Espèces">Espèces</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="invest-cheque-group" class="form-row" style="display: none; background: rgba(99, 102, 241, 0.05); padding: 12px; border-radius: var(--border-radius); border: 1px dashed var(--primary); margin-bottom: 15px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="invest-num-cheque">N° de Chèque</label>
+                        <input type="text" id="invest-num-cheque" placeholder="Ex: 1234567">
+                    </div>
+                    <div class="form-group checkbox-group" style="margin-top: 20px;">
+                        <input type="checkbox" id="invest-cheque-encaisse">
+                        <label for="invest-cheque-encaisse" style="margin-bottom: 0; cursor: pointer; font-weight: 600; color: var(--success);">Chèque Encaissé / Débité</label>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -1995,13 +2028,24 @@
                     </div>
                     <div class="form-group">
                         <label for="fete-expense-moyen">Moyen de Paiement</label>
-                        <select id="fete-expense-moyen" required>
+                        <select id="fete-expense-moyen" onchange="toggleChequeFields('fete-expense')" required>
                             <option value="Espèces">Espèces</option>
                             <option value="Chèque">Chèque</option>
                             <option value="Carte Bancaire">Carte Bancaire</option>
                             <option value="Virement">Virement</option>
                             <option value="Réserve">Réserve</option>
                         </select>
+                    </div>
+                </div>
+
+                <div id="fete-expense-cheque-group" class="form-row" style="display: none; background: rgba(99, 102, 241, 0.05); padding: 12px; border-radius: var(--border-radius); border: 1px dashed var(--primary); margin-bottom: 15px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="fete-expense-num-cheque">N° de Chèque</label>
+                        <input type="text" id="fete-expense-num-cheque" placeholder="Ex: 1234567">
+                    </div>
+                    <div class="form-group checkbox-group" style="margin-top: 20px;">
+                        <input type="checkbox" id="fete-expense-cheque-encaisse">
+                        <label for="fete-expense-cheque-encaisse" style="margin-bottom: 0; cursor: pointer; font-weight: 600; color: var(--success);">Chèque Encaissé / Débité</label>
                     </div>
                 </div>
                 <div class="form-row">
@@ -2063,7 +2107,7 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="fete-partner-moyen">Moyen de Paiement</label>
-                        <select id="fete-partner-moyen" required>
+                        <select id="fete-partner-moyen" onchange="toggleChequeFields('fete-partner')" required>
                             <option value="Virement">Virement</option>
                             <option value="Chèque">Chèque</option>
                             <option value="Espèces">Espèces</option>
@@ -2073,6 +2117,17 @@
                     <div class="form-group checkbox-group">
                         <input type="checkbox" id="fete-partner-paye" checked>
                         <label for="fete-partner-paye" style="margin-bottom: 0; cursor: pointer;">Sponsoring Reçu / Payé</label>
+                    </div>
+                </div>
+
+                <div id="fete-partner-cheque-group" class="form-row" style="display: none; background: rgba(99, 102, 241, 0.05); padding: 12px; border-radius: var(--border-radius); border: 1px dashed var(--primary); margin-bottom: 15px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="fete-partner-num-cheque">N° de Chèque</label>
+                        <input type="text" id="fete-partner-num-cheque" placeholder="Ex: 1234567">
+                    </div>
+                    <div class="form-group checkbox-group" style="margin-top: 20px;">
+                        <input type="checkbox" id="fete-partner-cheque-encaisse">
+                        <label for="fete-partner-cheque-encaisse" style="margin-bottom: 0; cursor: pointer; font-weight: 600; color: var(--success);">Chèque Encaissé / Débité</label>
                     </div>
                 </div>
                 <div class="form-group">
@@ -2127,6 +2182,6 @@
     <!-- Expense Category Hover Popover -->
     <div id="expense-category-popover" class="category-popover"></div>
 
-    <script src="app.js?v=5.5"></script>
+    <script src="app.js?v=5.6"></script>
 </body>
 </html>

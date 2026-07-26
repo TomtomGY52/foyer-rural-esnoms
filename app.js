@@ -1577,11 +1577,24 @@ function renderGeneralExpensesList() {
             }
         }
 
+        let chequeBadge = "";
+        if (t.moyen_payement === "Chèque" || t.num_cheque) {
+            const numStr = t.num_cheque ? ` n° ${t.num_cheque}` : "";
+            const isEnc = !!t.cheque_encaisse;
+            const badgeBg = isEnc ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)";
+            const badgeColor = isEnc ? "#10b981" : "#d97706";
+            const badgeBorder = isEnc ? "rgba(16, 185, 129, 0.3)" : "rgba(245, 158, 11, 0.3)";
+            const iconName = isEnc ? "check-square" : "square";
+            const statusText = isEnc ? "Encaissé" : "Non encaissé";
+
+            chequeBadge = `<span class="badge" style="background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeBorder}; margin-left: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer;" onclick="toggleChequeEncaisse('${t.id}', event)" title="Chèque : Cliquer pour basculer l'état d'encaissement">💳 Chèque${numStr} • <i data-lucide="${iconName}" style="width: 11px; height: 11px; vertical-align: middle; margin-right: 2px;"></i> ${statusText}</span>`;
+        }
+
         listBody.innerHTML += `
             <tr>
                 <td>${dateStr}</td>
                 <td>${catLabel}</td>
-                <td style="font-weight: 500;">${t.description}${eqBadge}</td>
+                <td style="font-weight: 500;">${t.description}${eqBadge}${chequeBadge}</td>
                 <td style="font-weight: 600; text-align: right; color: var(--danger);">${Number(t.montant).toFixed(2)} €</td>
                 <td>
                     <span class="badge ${payeBadgeClass}" style="cursor: pointer;" onclick="toggleTransactionPaid('${t.id}')" title="Changer statut de paiement">
@@ -1677,11 +1690,24 @@ function renderGeneralReceiptsList() {
             }
         }
 
+        let chequeBadge = "";
+        if (t.moyen_payement === "Chèque" || t.num_cheque) {
+            const numStr = t.num_cheque ? ` n° ${t.num_cheque}` : "";
+            const isEnc = !!t.cheque_encaisse;
+            const badgeBg = isEnc ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)";
+            const badgeColor = isEnc ? "#10b981" : "#d97706";
+            const badgeBorder = isEnc ? "rgba(16, 185, 129, 0.3)" : "rgba(245, 158, 11, 0.3)";
+            const iconName = isEnc ? "check-square" : "square";
+            const statusText = isEnc ? "Encaissé" : "Non encaissé";
+
+            chequeBadge = `<span class="badge" style="background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeBorder}; margin-left: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer;" onclick="toggleChequeEncaisse('${t.id}', event)" title="Chèque : Cliquer pour basculer l'état d'encaissement">💳 Chèque${numStr} • <i data-lucide="${iconName}" style="width: 11px; height: 11px; vertical-align: middle; margin-right: 2px;"></i> ${statusText}</span>`;
+        }
+
         listBody.innerHTML += `
             <tr>
                 <td>${dateStr}</td>
                 <td>${catLabel}</td>
-                <td style="font-weight: 500;">${t.description}${eqBadge}</td>
+                <td style="font-weight: 500;">${t.description}${eqBadge}${chequeBadge}</td>
                 <td style="font-weight: 600; text-align: right; color: var(--secondary);">${Number(t.montant).toFixed(2)} €</td>
                 <td>
                     <span class="badge ${payeBadgeClass}" style="cursor: pointer;" onclick="toggleTransactionPaid('${t.id}')" title="Changer statut de paiement">
@@ -1738,10 +1764,14 @@ function saveTransaction(e) {
     const produit_id = document.getElementById("transaction-produit").value;
     const equipement_id = document.getElementById("transaction-equipement") ? document.getElementById("transaction-equipement").value : "";
 
+    const num_cheque = document.getElementById("transaction-num-cheque") ? document.getElementById("transaction-num-cheque").value.trim() : "";
+    const cheque_encaisse = document.getElementById("transaction-cheque-encaisse") ? document.getElementById("transaction-cheque-encaisse").checked : false;
+
     const data = {
         type_flux, date_transaction, categorie_id, moyen_payement,
         prix, quantite, montant, paye, description,
-        adherent_id, manifestation_id, investissement_id, produit_id, equipement_id
+        adherent_id, manifestation_id, investissement_id, produit_id, equipement_id,
+        num_cheque, cheque_encaisse
     };
 
     if (dbMode === 'firebase') {
@@ -1808,13 +1838,21 @@ function editTransaction(id) {
     document.getElementById("transaction-id").value = t.id;
     document.getElementById("transaction-flux").value = t.type_flux;
     document.getElementById("transaction-date").value = t.date_transaction;
-    document.getElementById("transaction-moyen").value = t.moyen_payement;
+    document.getElementById("transaction-moyen").value = t.moyen_payement || "Espèces";
     document.getElementById("transaction-prix").value = t.prix;
     document.getElementById("transaction-quantite").value = t.quantite;
     document.getElementById("transaction-montant").value = t.montant;
     document.getElementById("transaction-paye").checked = t.paye;
     document.getElementById("transaction-desc").value = t.description;
     
+    if (document.getElementById("transaction-num-cheque")) {
+        document.getElementById("transaction-num-cheque").value = t.num_cheque || "";
+    }
+    if (document.getElementById("transaction-cheque-encaisse")) {
+        document.getElementById("transaction-cheque-encaisse").checked = !!t.cheque_encaisse;
+    }
+    toggleChequeFields('transaction');
+
     document.getElementById("transaction-adherent").value = t.adherent_id || "";
     document.getElementById("transaction-manifestation").value = t.manifestation_id || "";
     document.getElementById("transaction-investissement").value = t.investissement_id || "";
@@ -1830,6 +1868,77 @@ function editTransaction(id) {
     
     document.getElementById("transaction-modal-title").innerText = "Modifier la Transaction";
     openModal("modal-transaction");
+}
+
+function toggleChequeFields(prefix) {
+    const moyenEl = document.getElementById(prefix + "-moyen");
+    const chequeGroup = document.getElementById(prefix + "-cheque-group");
+    if (!moyenEl || !chequeGroup) return;
+
+    if (moyenEl.value === "Chèque") {
+        chequeGroup.style.display = "flex";
+    } else {
+        chequeGroup.style.display = "none";
+    }
+}
+
+function toggleChequeEncaisse(txId, event) {
+    if (event) event.stopPropagation();
+    if (!hasWritePermission("comptabilite") && !hasWritePermission("manifestations")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
+    const tx = STATE.transactions.find(t => t.id === txId);
+    if (!tx) return;
+
+    tx.cheque_encaisse = !tx.cheque_encaisse;
+
+    // Sync linked manifestation expense if present
+    const exp = (STATE.feteRuraleExpenses || []).find(e => e.transaction_id === txId);
+    if (exp) {
+        exp.cheque_encaisse = tx.cheque_encaisse;
+        if (dbMode === 'firebase') {
+            saveFeteData("feteRuraleExpenses", exp);
+        }
+    }
+
+    if (dbMode === 'firebase') {
+        db.collection("transactions").doc(tx.id).update({
+            cheque_encaisse: tx.cheque_encaisse
+        }).then(() => refreshAllViews()).catch(err => alert("Erreur d'enregistrement: " + err));
+    } else {
+        saveState();
+        refreshAllViews();
+    }
+}
+
+function toggleFeteExpenseChequeEncaisse(expId, event) {
+    if (event) event.stopPropagation();
+    if (!hasWritePermission("manifestations")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
+    const exp = (STATE.feteRuraleExpenses || []).find(e => e.id === expId);
+    if (!exp) return;
+
+    exp.cheque_encaisse = !exp.cheque_encaisse;
+
+    if (exp.transaction_id) {
+        const tx = STATE.transactions.find(t => t.id === exp.transaction_id);
+        if (tx) {
+            tx.cheque_encaisse = exp.cheque_encaisse;
+            if (dbMode === 'firebase') {
+                db.collection("transactions").doc(tx.id).update({ cheque_encaisse: tx.cheque_encaisse });
+            }
+        }
+    }
+
+    if (dbMode === 'firebase') {
+        saveFeteData("feteRuraleExpenses", exp, () => refreshAllViews());
+    } else {
+        saveState();
+        refreshAllViews();
+    }
 }
 
 function deleteTransaction(id) {
@@ -2821,8 +2930,11 @@ function saveInvestissement(e) {
     const rawAmortVal = document.getElementById("invest-amort").value;
     const duree_amortissement_ans = rawAmortVal !== "" ? (Number(rawAmortVal) || 0) : 0;
     const etat = document.getElementById("invest-etat").value;
+    const moyen = document.getElementById("invest-moyen") ? document.getElementById("invest-moyen").value : "Virement";
+    const num_cheque = document.getElementById("invest-num-cheque") ? document.getElementById("invest-num-cheque").value.trim() : "";
+    const cheque_encaisse = document.getElementById("invest-cheque-encaisse") ? document.getElementById("invest-cheque-encaisse").checked : false;
 
-    const data = { libelle, date_acquisition, montant_achat, duree_amortissement_ans, etat };
+    const data = { libelle, date_acquisition, montant_achat, duree_amortissement_ans, etat, moyen_payement: moyen, num_cheque, cheque_encaisse };
 
     if (dbMode === 'firebase') {
         if (id) {
@@ -2837,7 +2949,9 @@ function saveInvestissement(e) {
                         type_flux: "Dépense",
                         date_transaction: date_acquisition,
                         categorie_id: "cat-8", // Investissement Amortissable
-                        moyen_payement: "Virement",
+                        moyen_payement: moyen,
+                        num_cheque: num_cheque,
+                        cheque_encaisse: cheque_encaisse,
                         prix: montant_achat,
                         quantite: 1,
                         montant: montant_achat,
@@ -2863,7 +2977,9 @@ function saveInvestissement(e) {
                 type_flux: "Dépense",
                 date_transaction: date_acquisition,
                 categorie_id: "cat-8", // Investissement Amortissable
-                moyen_payement: "Virement",
+                moyen_payement: moyen,
+                num_cheque: num_cheque,
+                cheque_encaisse: cheque_encaisse,
                 prix: montant_achat,
                 quantite: 1,
                 montant: montant_achat,
@@ -2888,6 +3004,16 @@ function editInvestissement(id) {
     document.getElementById("invest-montant").value = inv.montant_achat;
     document.getElementById("invest-amort").value = inv.duree_amortissement_ans;
     document.getElementById("invest-etat").value = inv.etat;
+    if (document.getElementById("invest-moyen")) {
+        document.getElementById("invest-moyen").value = inv.moyen_payement || "Virement";
+    }
+    if (document.getElementById("invest-num-cheque")) {
+        document.getElementById("invest-num-cheque").value = inv.num_cheque || "";
+    }
+    if (document.getElementById("invest-cheque-encaisse")) {
+        document.getElementById("invest-cheque-encaisse").checked = !!inv.cheque_encaisse;
+    }
+    toggleChequeFields('invest');
     
     document.getElementById("investissement-modal-title").innerText = "Modifier l'Investissement";
     openModal("modal-investissement");
@@ -4415,6 +4541,14 @@ function openFeteExpenseModal() {
     if (document.getElementById("fete-expense-equipement")) {
         document.getElementById("fete-expense-equipement").value = "";
     }
+    if (document.getElementById("fete-expense-num-cheque")) {
+        document.getElementById("fete-expense-num-cheque").value = "";
+    }
+    if (document.getElementById("fete-expense-cheque-encaisse")) {
+        document.getElementById("fete-expense-cheque-encaisse").checked = false;
+    }
+    toggleChequeFields('fete-expense');
+    
     const m = STATE.manifestations.find(item => item.id === activeManifestationId);
     const mName = m ? m.nom : "Manifestation";
     document.getElementById("fete-expense-modal-title").innerText = "Nouvelle Dépense - " + mName;
@@ -4441,7 +4575,7 @@ function editFeteExpense(id) {
         if (found) targetCatId = found.id;
     }
     document.getElementById("fete-expense-cat").value = targetCatId;
-    document.getElementById("fete-expense-moyen").value = exp.moyen_payement;
+    document.getElementById("fete-expense-moyen").value = exp.moyen_payement || "Espèces";
     document.getElementById("fete-expense-payea").value = exp.paye_a;
     document.getElementById("fete-expense-paye").checked = exp.paye;
     document.getElementById("fete-expense-comment").value = exp.commentaire || "";
@@ -4449,6 +4583,14 @@ function editFeteExpense(id) {
     if (document.getElementById("fete-expense-equipement")) {
         document.getElementById("fete-expense-equipement").value = exp.equipement_id || "";
     }
+    if (document.getElementById("fete-expense-num-cheque")) {
+        document.getElementById("fete-expense-num-cheque").value = exp.num_cheque || "";
+    }
+    if (document.getElementById("fete-expense-cheque-encaisse")) {
+        document.getElementById("fete-expense-cheque-encaisse").checked = !!exp.cheque_encaisse;
+    }
+    toggleChequeFields('fete-expense');
+
     document.getElementById("fete-expense-modal-title").innerText = "Modifier la Dépense";
     
     openModal("modal-fete-expense");
@@ -4471,6 +4613,8 @@ function saveFeteExpense(e) {
     const comment = document.getElementById("fete-expense-comment").value;
     const scan = document.getElementById("fete-expense-scan-data").value;
     const equipement_id = document.getElementById("fete-expense-equipement") ? document.getElementById("fete-expense-equipement").value : "";
+    const num_cheque = document.getElementById("fete-expense-num-cheque") ? document.getElementById("fete-expense-num-cheque").value.trim() : "";
+    const cheque_encaisse = document.getElementById("fete-expense-cheque-encaisse") ? document.getElementById("fete-expense-cheque-encaisse").checked : false;
     
     const exp = STATE.feteRuraleExpenses.find(x => x.id === id);
     const existingTxId = exp ? exp.transaction_id : "";
@@ -4485,7 +4629,9 @@ function saveFeteExpense(e) {
         moyen_payement: moyen,
         categorie_id: feteCat,
         manifestation_id: activeManifestationId,
-        equipement_id
+        equipement_id,
+        num_cheque,
+        cheque_encaisse
     };
     
     syncFeteFinancialToTransactions(existingTxId, txData, (newTxId) => {
@@ -4517,7 +4663,9 @@ function saveFeteExpense(e) {
                     transaction_id: newTxId,
                     reserve_transaction_id: newReserveTxId,
                     manifestation_id: activeManifestationId,
-                    equipement_id
+                    equipement_id,
+                    num_cheque,
+                    cheque_encaisse
                 };
                 saveFeteData("feteRuraleExpenses", expenseObj, () => {
                     closeModal("modal-fete-expense");
@@ -5220,6 +5368,19 @@ function renderFeteRurale() {
                                 <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
                             </button>
                         </div>` : `<span style="color: var(--text-muted);">--</span>`;
+            let chequeBadge = "";
+            if (e.moyen_payement === "Chèque" || e.num_cheque) {
+                const numStr = e.num_cheque ? ` n° ${e.num_cheque}` : "";
+                const isEnc = !!e.cheque_encaisse;
+                const badgeBg = isEnc ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)";
+                const badgeColor = isEnc ? "#10b981" : "#d97706";
+                const badgeBorder = isEnc ? "rgba(16, 185, 129, 0.3)" : "rgba(245, 158, 11, 0.3)";
+                const iconName = isEnc ? "check-square" : "square";
+                const statusText = isEnc ? "Encaissé" : "Non encaissé";
+
+                chequeBadge = `<br><span class="badge" style="background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeBorder}; margin-top: 3px; font-size: 0.73rem; font-weight: 600; cursor: pointer;" onclick="toggleFeteExpenseChequeEncaisse('${e.id}', event)" title="Chèque : Cliquer pour cocher/décocher l'encaissement">💳 ${numStr || 'N° non répertorié'} • <i data-lucide="${iconName}" style="width: 11px; height: 11px; vertical-align: middle; margin-right: 2px;"></i> ${statusText}</span>`;
+            }
+
             expensesTable.innerHTML += `
                 <tr>
                     <td>${formatDateFrench(new Date(e.date))}</td>
@@ -5227,7 +5388,7 @@ function renderFeteRurale() {
                     <td>${catLabel}</td>
                     <td>${e.paye_a}</td>
                     <td style="color: var(--danger); font-weight: 600;">${Number(e.montant).toFixed(2)} €</td>
-                    <td>${e.moyen_payement}</td>
+                    <td>${e.moyen_payement}${chequeBadge}</td>
                     <td>${paidBadge}</td>
                     <td>${scanBtn}</td>
                     <td>
