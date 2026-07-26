@@ -1,7 +1,14 @@
 // ============================================================================
-// FOYER RURAL ASSOCIATION MANAGEMENT ENGINE - app.js
-// Handles State, LocalStorage / Firestore sync, Calendar, Charts, Invoicing, etc.
-// ============================================================================
+// Safe Lucide icon rendering helper
+function safeCreateIcons() {
+    if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
+        try {
+            lucide.createIcons();
+        } catch (e) {
+            console.warn("Lucide createIcons warning:", e);
+        }
+    }
+}
 
 // --- Central State Store ---
 let STATE = {
@@ -174,7 +181,7 @@ function initApp() {
     setWeekStart(new Date());
     
     // Initialize icons
-    lucide.createIcons();
+    safeCreateIcons();
 }
 
 // --- Local Storage Database Mode ---
@@ -715,7 +722,7 @@ function setupNavigation() {
                 renderFeteRurale();
             }
             
-            lucide.createIcons();
+            safeCreateIcons();
         });
     });
 }
@@ -757,7 +764,7 @@ function setupSubNavigation() {
             parentPane.querySelectorAll(".accounting-sub-pane").forEach(p => p.classList.remove("active"));
             parentPane.querySelector(`#subtab-${subtabId}`).classList.add("active");
             
-            lucide.createIcons();
+            safeCreateIcons();
         });
     });
 }
@@ -1138,7 +1145,7 @@ function renderAdherentsList() {
         `;
     });
     
-    lucide.createIcons();
+    safeCreateIcons();
 }
 
 function saveAdherent(e) {
@@ -1598,7 +1605,7 @@ function renderGeneralExpensesList() {
         `;
     });
     
-    lucide.createIcons();
+    safeCreateIcons();
     updateSortIndicators('depenses');
 }
 
@@ -1698,7 +1705,7 @@ function renderGeneralReceiptsList() {
         `;
     });
     
-    lucide.createIcons();
+    safeCreateIcons();
     updateSortIndicators('recettes');
 }
 
@@ -2277,7 +2284,7 @@ function renderManifestationsList() {
         `;
     });
 
-    lucide.createIcons();
+    safeCreateIcons();
     updateSortIndicators('manifestations');
 }
 
@@ -2490,7 +2497,7 @@ function renderProduitsList() {
         `;
     });
 
-    lucide.createIcons();
+    safeCreateIcons();
     updateSortIndicators('produits');
 }
 
@@ -2797,7 +2804,7 @@ function renderInvestissementsList() {
         `;
     });
 
-    lucide.createIcons();
+    safeCreateIcons();
     updateSortIndicators('investissements');
 }
 
@@ -3803,7 +3810,7 @@ function renderSettingsCategoriesList() {
             </tr>
         `;
     });
-    lucide.createIcons();
+    safeCreateIcons();
 }
 
 function editCategory(id) {
@@ -5163,7 +5170,7 @@ function renderFeteRurale() {
         });
     }
     
-    lucide.createIcons();
+    safeCreateIcons();
 }
 
 // ============================================================================
@@ -5594,7 +5601,7 @@ function renderSettingsProfilesList() {
             </tr>
         `;
     });
-    lucide.createIcons();
+    safeCreateIcons();
 }
 
 function editUserProfile(id) {
