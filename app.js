@@ -3300,9 +3300,9 @@ function buildAndShowInvoice(customer, tx) {
             
             <!-- Totals Box -->
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px;">
-                <div style="max-width: 320px; font-size: 0.8rem; color: #475569;">
+                <div style="flex: 1; max-width: 480px; font-size: 0.82rem; color: #475569; margin-right: 20px;">
                     <div style="font-weight: 700; color: #1e1b4b; margin-bottom: 4px;">Règlement par virement bancaire :</div>
-                    <input type="text" id="invoice-edit-emitter-iban" value="${emitter.iban}" placeholder="IBAN & BIC" style="border: 1px dashed #cbd5e1; background: transparent; padding: 2px 4px; font-size: 0.78rem; width: 100%; font-family: monospace;" />
+                    <textarea id="invoice-edit-emitter-iban" rows="2" placeholder="IBAN & BIC" style="border: 1px dashed #cbd5e1; background: transparent; padding: 4px 6px; font-size: 0.82rem; width: 100%; font-family: monospace; line-height: 1.4; resize: vertical; box-sizing: border-box;">${emitter.iban}</textarea>
                 </div>
                 <table style="width: 240px; border-collapse: collapse; font-size: 0.85rem;">
                     <tr>
