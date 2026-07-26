@@ -1529,7 +1529,8 @@ tr:hover td {
     #modal-invoice .modal-close {
         display: none !important;
     }
-    #modal-invoice input, #modal-invoice textarea, #modal-invoice select {
+    #modal-invoice input, #modal-invoice textarea, #modal-invoice select,
+    #modal-partner-invoice input, #modal-partner-invoice textarea, #modal-partner-invoice select {
         border: none !important;
         background: transparent !important;
         box-shadow: none !important;

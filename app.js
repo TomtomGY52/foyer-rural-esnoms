@@ -6343,13 +6343,14 @@ function deletePartnerAssociation(id) {
 function generatePartnerInvoice(assocName) {
     const assocInfo = (STATE.partnerAssociations || []).find(a => (a.nom || "").trim().toLowerCase() === assocName.trim().toLowerCase()) || {
         nom: assocName,
-        contact: "Président / Trésorier",
-        email: "Non renseigné",
-        phone: "Non renseigné",
-        adresse: "Non renseignée",
-        siret: "N/A"
+        contact: "",
+        email: "",
+        phone: "",
+        adresse: "",
+        siret: ""
     };
 
+    const emitter = getEmitterInfo();
     const currentYear = STATE.currentPeriod || new Date().getFullYear();
     const todayStr = formatDateFrench(new Date());
     const logoSrc = localStorage.getItem("foyer_logo_url") || 'logo.png';
@@ -6430,24 +6431,30 @@ function generatePartnerInvoice(assocName) {
 
     const htmlContent = `
         <div style="background: white; color: #0f172a; padding: 28px; border-radius: 8px; font-family: system-ui, -apple-system, sans-serif;">
-            <!-- Header with Logo -->
+            <!-- Header with Logo and Emitter Info -->
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 16px; margin-bottom: 20px;">
                 <div style="display: flex; align-items: center; gap: 16px;">
-                    <img src="${logoSrc}" alt="Logo Foyer Rural" style="max-height: 65px; max-width: 140px; object-fit: contain;">
+                    <img src="${logoSrc}" alt="Logo Foyer Rural" style="max-height: 65px; max-width: 130px; object-fit: contain;">
                     <div>
-                        <h1 style="color: #4338ca; margin: 0; font-size: 1.35rem; font-weight: 800;">FOYER RURAL D'ESNOMS AU VAL</h1>
-                        <div style="font-size: 0.85rem; color: #475569; margin-top: 3px;">
-                            Place de la Mairie, 52190 Esnoms-au-Val<br>
-                            Email : foyer.rural.esnoms@gmail.com
+                        <input type="text" id="partner-inv-edit-emitter-nom" value="${emitter.nom}" placeholder="Nom de l'Association" style="font-size: 1.25rem; font-weight: 800; color: #4338ca; border: 1px dashed #cbd5e1; background: transparent; padding: 2px 4px; width: 310px;" />
+                        <div>
+                            <input type="text" id="partner-inv-edit-emitter-status" value="${emitter.status}" placeholder="Mention légale" style="font-size: 0.8rem; color: #475569; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; width: 290px; margin-top: 2px;" />
+                        </div>
+                        <div>
+                            <input type="text" id="partner-inv-edit-emitter-adresse" value="${emitter.adresse}" placeholder="Adresse du siège" style="font-size: 0.8rem; color: #475569; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; width: 290px; margin-top: 2px;" />
+                        </div>
+                        <div>
+                            <input type="text" id="partner-inv-edit-emitter-email" value="${emitter.email}" placeholder="Email" style="font-size: 0.8rem; color: #475569; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; width: 190px; margin-top: 2px;" />
+                            <input type="text" id="partner-inv-edit-emitter-phone" value="${emitter.phone}" placeholder="Tél" style="font-size: 0.8rem; color: #475569; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; width: 110px; margin-top: 2px;" />
                         </div>
                     </div>
                 </div>
                 <div style="text-align: right;">
-                    <div style="font-size: 0.95rem; font-weight: 800; color: #1e1b4b; text-transform: uppercase;">${docTypeLabel}</div>
-                    <div style="font-size: 0.85rem; color: #64748b; margin-top: 4px;">
-                        Réf : <strong>FAC-INTER-${currentYear}-${(assocInfo.nom || assocName).replace(/\s+/g, '-').toUpperCase()}</strong><br>
-                        Date d'émission : <strong>${todayStr}</strong><br>
-                        Exercice comptable : <strong>${currentYear}</strong>
+                    <input type="text" id="partner-inv-edit-doctype" value="${docTypeLabel}" style="font-size: 0.88rem; font-weight: 800; color: #1e1b4b; text-transform: uppercase; border: 1px dashed #cbd5e1; background: transparent; padding: 2px 4px; width: 330px; text-align: right;" />
+                    <div style="font-size: 0.83rem; color: #64748b; margin-top: 6px;">
+                        Réf : <input type="text" id="partner-inv-edit-ref" value="FAC-INTER-${currentYear}-${(assocInfo.nom || assocName).replace(/\s+/g, '-').toUpperCase()}" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 700; width: 210px; text-align: right; padding: 1px 4px;" /><br>
+                        Date d'émission : <input type="text" id="partner-inv-edit-date" value="${todayStr}" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 600; width: 110px; text-align: right; padding: 1px 4px; margin-top: 2px;" /><br>
+                        Exercice comptable : <input type="text" id="partner-inv-edit-year" value="${currentYear}" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 600; width: 60px; text-align: right; padding: 1px 4px; margin-top: 2px;" />
                     </div>
                 </div>
             </div>
@@ -6455,13 +6462,16 @@ function generatePartnerInvoice(assocName) {
             <!-- Recipient Box -->
             <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 20px;">
                 <div style="font-size: 0.72rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Association Partenaire Destinataire</div>
-                <div style="font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 8px;">🏢 ${assocInfo.nom || assocName}</div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 0.83rem; color: #334155;">
-                    <div>👤 <strong>Contact :</strong> ${assocInfo.contact || "Non renseigné"}</div>
-                    <div>✉️ <strong>Email du Contact :</strong> ${assocInfo.email ? `<a href="mailto:${assocInfo.email}" style="color: #4338ca; text-decoration: none;">${assocInfo.email}</a>` : "Non renseigné"}</div>
-                    <div>📞 <strong>Téléphone :</strong> ${assocInfo.phone || "Non renseigné"}</div>
-                    <div>📍 <strong>Adresse Postale :</strong> ${assocInfo.adresse || "Non renseignée"}</div>
-                    <div>🏢 <strong>SIRET / RNA :</strong> ${assocInfo.siret || "N/A"}</div>
+                <input type="hidden" id="partner-inv-edit-assoc-id" value="${assocInfo.id || ''}">
+                <div style="font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                    🏢 <input type="text" id="partner-inv-edit-assoc-nom" value="${assocInfo.nom || assocName}" placeholder="Nom de l'association partenaire" style="border: 1px dashed #cbd5e1; background: transparent; padding: 2px 6px; font-weight: 700; font-family: inherit; font-size: 1.05rem; width: 340px;" />
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.83rem; color: #334155;">
+                    <div>👤 <strong>Contact :</strong> <input type="text" id="partner-inv-edit-assoc-contact" value="${assocInfo.contact || ''}" placeholder="Nom du contact" style="border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; font-family: inherit; font-size: 0.83rem; width: 170px;" /></div>
+                    <div>✉️ <strong>Email du Contact :</strong> <input type="email" id="partner-inv-edit-assoc-email" value="${assocInfo.email || ''}" placeholder="email@exemple.fr" style="border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; font-family: inherit; font-size: 0.83rem; width: 190px;" /></div>
+                    <div>📞 <strong>Téléphone :</strong> <input type="text" id="partner-inv-edit-assoc-phone" value="${assocInfo.phone || ''}" placeholder="06 XX XX XX XX" style="border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; font-family: inherit; font-size: 0.83rem; width: 150px;" /></div>
+                    <div>📍 <strong>Adresse Postale :</strong> <input type="text" id="partner-inv-edit-assoc-adresse" value="${assocInfo.adresse || ''}" placeholder="Adresse complète" style="border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; font-family: inherit; font-size: 0.83rem; width: 220px;" /></div>
+                    <div style="grid-column: span 2;">🏢 <strong>SIRET / RNA :</strong> <input type="text" id="partner-inv-edit-assoc-siret" value="${assocInfo.siret || ''}" placeholder="SIRET ou W..." style="border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; font-family: inherit; font-size: 0.83rem; width: 180px;" /></div>
                 </div>
             </div>
 
@@ -6485,26 +6495,27 @@ function generatePartnerInvoice(assocName) {
             </table>
 
             <!-- Summary Status Box -->
-            <div style="background: ${statusBoxBg}; border: 2px solid ${statusBoxBorder}; border-radius: 8px; padding: 18px; text-align: center; margin-bottom: 32px;">
-                <div style="font-size: 1.2rem; font-weight: 800; color: ${statusBoxTextColor}; margin-bottom: 4px;">
-                    ${statusTextHeader}
-                </div>
-                <div style="font-size: 0.85rem; color: ${statusBoxTextColor};">
-                    ${totalAssocNet >= 0 ? "Document justificatif de recette à valoir pour la comptabilité de l'association partenaire." : "Document valant facture et pièce justificative de dépense pour la comptabilité de l'association partenaire."}
-                </div>
+            <div style="background: ${statusBoxBg}; border: 2px solid ${statusBoxBorder}; border-radius: 8px; padding: 18px; text-align: center; margin-bottom: 24px;">
+                <textarea id="partner-inv-edit-status-header" rows="1" style="font-size: 1.15rem; font-weight: 800; color: ${statusBoxTextColor}; width: 100%; text-align: center; border: 1px dashed #cbd5e1; background: transparent; font-family: inherit; resize: vertical;">${statusTextHeader}</textarea>
+                <textarea id="partner-inv-edit-status-desc" rows="1" style="font-size: 0.85rem; color: ${statusBoxTextColor}; width: 100%; text-align: center; border: 1px dashed #cbd5e1; background: transparent; font-family: inherit; margin-top: 4px; resize: vertical;">${totalAssocNet >= 0 ? "Document justificatif de recette à valoir pour la comptabilité de l'association partenaire." : "Document valant facture et pièce justificative de dépense pour la comptabilité de l'association partenaire."}</textarea>
+            </div>
+
+            <!-- Payment IBAN Area -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 28px;">
+                <div style="font-weight: 700; color: #1e1b4b; font-size: 0.85rem; margin-bottom: 4px;">Règlement par virement bancaire (RIB / IBAN du Foyer) :</div>
+                <textarea id="partner-inv-edit-emitter-iban" rows="2" placeholder="IBAN & BIC de l'association" style="border: 1px dashed #cbd5e1; background: transparent; padding: 4px 6px; font-size: 0.82rem; width: 100%; font-family: monospace; line-height: 1.4; resize: vertical; box-sizing: border-box;">${emitter.iban}</textarea>
             </div>
 
             <!-- Signatures area -->
-            <div style="display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; border-top: 1px dashed #cbd5e1; font-size: 0.85rem; color: #475569;">
+            <div style="display: flex; justify-content: space-between; margin-top: 30px; padding-top: 20px; border-top: 1px dashed #cbd5e1; font-size: 0.85rem; color: #475569;">
                 <div>
-                    <strong>Pour le Foyer Rural d'Esnoms au Val</strong><br>
+                    <input type="text" id="partner-inv-edit-sig-foyer" value="Pour le ${emitter.nom}" style="font-weight: 700; border: 1px dashed #cbd5e1; background: transparent; font-family: inherit; width: 260px;" /><br>
                     Le Trésorier / Le Président<br>
                     <small style="color: #94a3b8;">Signature & Cachet</small>
                 </div>
                 <div style="text-align: right;">
-                    <strong>Pour l'Association Partenaire</strong><br>
-                    ${assocInfo.nom || assocName}<br>
-                    <small style="color: #94a3b8;">Signature & Mention "Bon pour accord"</small>
+                    <input type="text" id="partner-inv-edit-sig-assoc" value="Pour ${assocInfo.nom || assocName}" style="font-weight: 700; border: 1px dashed #cbd5e1; background: transparent; font-family: inherit; width: 260px; text-align: right;" /><br>
+                    Signature & Mention "Bon pour accord"
                 </div>
             </div>
         </div>
@@ -6512,6 +6523,65 @@ function generatePartnerInvoice(assocName) {
 
     document.getElementById("partner-invoice-printable-content").innerHTML = htmlContent;
     openModal("modal-partner-invoice");
+}
+
+function savePartnerInvoiceEdits() {
+    if (!hasWritePermission("bilan")) {
+        alert("Action non autorisée (lecture seule).");
+        return;
+    }
+
+    // 1. Save Emitter Info if edited
+    const eName = document.getElementById("partner-inv-edit-emitter-nom");
+    if (eName) {
+        const emitter = {
+            nom: eName.value.trim(),
+            status: document.getElementById("partner-inv-edit-emitter-status") ? document.getElementById("partner-inv-edit-emitter-status").value.trim() : "",
+            adresse: document.getElementById("partner-inv-edit-emitter-adresse") ? document.getElementById("partner-inv-edit-emitter-adresse").value.trim() : "",
+            email: document.getElementById("partner-inv-edit-emitter-email") ? document.getElementById("partner-inv-edit-emitter-email").value.trim() : "",
+            phone: document.getElementById("partner-inv-edit-emitter-phone") ? document.getElementById("partner-inv-edit-emitter-phone").value.trim() : "",
+            siret: document.getElementById("partner-inv-edit-emitter-siret") ? document.getElementById("partner-inv-edit-emitter-siret").value.trim() : "",
+            iban: document.getElementById("partner-inv-edit-emitter-iban") ? document.getElementById("partner-inv-edit-emitter-iban").value.trim() : ""
+        };
+        STATE.emitterInfo = emitter;
+        localStorage.setItem("foyer_emitter_info", JSON.stringify(emitter));
+        if (dbMode === 'firebase') {
+            db.collection("settings").doc("emitter").set(emitter).catch(err => console.error(err));
+        }
+    }
+
+    // 2. Save Partner Assoc Info if edited
+    const aNomEl = document.getElementById("partner-inv-edit-assoc-nom");
+    if (aNomEl) {
+        const assocId = document.getElementById("partner-inv-edit-assoc-id") ? document.getElementById("partner-inv-edit-assoc-id").value : "";
+        const nom = aNomEl.value.trim();
+        const contact = document.getElementById("partner-inv-edit-assoc-contact") ? document.getElementById("partner-inv-edit-assoc-contact").value.trim() : "";
+        const email = document.getElementById("partner-inv-edit-assoc-email") ? document.getElementById("partner-inv-edit-assoc-email").value.trim() : "";
+        const phone = document.getElementById("partner-inv-edit-assoc-phone") ? document.getElementById("partner-inv-edit-assoc-phone").value.trim() : "";
+        const adresse = document.getElementById("partner-inv-edit-assoc-adresse") ? document.getElementById("partner-inv-edit-assoc-adresse").value.trim() : "";
+        const siret = document.getElementById("partner-inv-edit-assoc-siret") ? document.getElementById("partner-inv-edit-assoc-siret").value.trim() : "";
+
+        if (nom) {
+            const id = assocId || "assoc-" + Date.now();
+            const assocData = { id, nom, contact, email, phone, adresse, siret };
+            if (!STATE.partnerAssociations) STATE.partnerAssociations = [];
+            const idx = STATE.partnerAssociations.findIndex(x => x.id === id || (x.nom || "").trim().toLowerCase() === nom.toLowerCase());
+            if (idx >= 0) STATE.partnerAssociations[idx] = assocData;
+            else STATE.partnerAssociations.push(assocData);
+
+            if (dbMode === 'firebase') {
+                db.collection("partnerAssociations").doc(id).set(assocData).catch(err => console.error(err));
+            }
+        }
+    }
+
+    if (dbMode === 'local') {
+        saveState();
+    }
+
+    closeModal("modal-partner-invoice");
+    refreshAllViews();
+    alert("Décompte inter-association et coordonnées enregistrés avec succès !");
 }
 
 function hideEquipmentDetailsPopover() {
