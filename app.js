@@ -6118,8 +6118,9 @@ function renderSettingsPartnerAssocsList() {
     assocs.forEach(a => {
         let detailsHtml = "";
         if (a.contact) detailsHtml += `<div>👤 <strong>Contact:</strong> ${a.contact}</div>`;
+        if (a.email) detailsHtml += `<div style="font-size: 0.78rem; color: var(--text-muted);">✉️ <strong>Email:</strong> ${a.email}</div>`;
+        if (a.phone) detailsHtml += `<div style="font-size: 0.78rem; color: var(--text-muted);">📞 <strong>Tél:</strong> ${a.phone}</div>`;
         if (a.adresse) detailsHtml += `<div style="font-size: 0.78rem; color: var(--text-muted);">📍 ${a.adresse}</div>`;
-        if (a.email) detailsHtml += `<div style="font-size: 0.78rem; color: var(--text-muted);">✉️ ${a.email}</div>`;
         if (a.siret) detailsHtml += `<div style="font-size: 0.75rem; color: var(--primary);">N° ${a.siret}</div>`;
         if (!detailsHtml) detailsHtml = `<span style="color: var(--text-muted); font-size: 0.82rem;">Aucune coordonnée renseignée</span>`;
 
@@ -6144,7 +6145,7 @@ function renderSettingsPartnerAssocsList() {
         `;
     });
 
-    if (typeof lucide !== 'undefined') lucide.createIcons();
+    safeCreateIcons();
 }
 
 function editPartnerAssociation(id) {
@@ -6154,8 +6155,10 @@ function editPartnerAssociation(id) {
     document.getElementById("partner-assoc-id").value = a.id;
     document.getElementById("partner-assoc-name").value = a.nom;
     document.getElementById("partner-assoc-contact").value = a.contact || "";
-    document.getElementById("partner-assoc-adresse").value = a.adresse || "";
     document.getElementById("partner-assoc-email").value = a.email || "";
+    const phoneInput = document.getElementById("partner-assoc-phone");
+    if (phoneInput) phoneInput.value = a.phone || "";
+    document.getElementById("partner-assoc-adresse").value = a.adresse || "";
     document.getElementById("partner-assoc-siret").value = a.siret || "";
 
     const titleEl = document.getElementById("partner-assoc-form-title");
@@ -6178,13 +6181,14 @@ function savePartnerAssociation(e) {
     const id = document.getElementById("partner-assoc-id").value || "assoc-" + Date.now();
     const nom = document.getElementById("partner-assoc-name").value.trim();
     const contact = document.getElementById("partner-assoc-contact") ? document.getElementById("partner-assoc-contact").value.trim() : "";
-    const adresse = document.getElementById("partner-assoc-adresse") ? document.getElementById("partner-assoc-adresse").value.trim() : "";
     const email = document.getElementById("partner-assoc-email") ? document.getElementById("partner-assoc-email").value.trim() : "";
+    const phone = document.getElementById("partner-assoc-phone") ? document.getElementById("partner-assoc-phone").value.trim() : "";
+    const adresse = document.getElementById("partner-assoc-adresse") ? document.getElementById("partner-assoc-adresse").value.trim() : "";
     const siret = document.getElementById("partner-assoc-siret") ? document.getElementById("partner-assoc-siret").value.trim() : "";
 
     if (!nom) return;
 
-    const assocData = { id, nom, contact, adresse, email, siret };
+    const assocData = { id, nom, contact, email, phone, adresse, siret };
 
     if (dbMode === 'firebase') {
         db.collection("partnerAssociations").doc(id).set(assocData)
@@ -6222,17 +6226,18 @@ function generatePartnerInvoice(assocName) {
     const assocInfo = (STATE.partnerAssociations || []).find(a => (a.nom || "").trim().toLowerCase() === assocName.trim().toLowerCase()) || {
         nom: assocName,
         contact: "Président / Trésorier",
-        adresse: "Non renseignée",
         email: "Non renseigné",
+        phone: "Non renseigné",
+        adresse: "Non renseignée",
         siret: "N/A"
     };
 
     const currentYear = STATE.currentPeriod || new Date().getFullYear();
     const todayStr = formatDateFrench(new Date());
+    const logoSrc = STATE.logoBase64 || 'logo.png';
 
     const sharedEquips = STATE.sharedEquipments || [];
     let equipmentsBreakdown = [];
-    let allTxList = [];
     let totalAssocRec = 0;
     let totalAssocDep = 0;
     let totalAssocNet = 0;
@@ -6240,12 +6245,10 @@ function generatePartnerInvoice(assocName) {
     sharedEquips.forEach(eq => {
         let eqRec = 0;
         let eqDep = 0;
-        let eqTxList = [];
 
         STATE.transactions.forEach(t => {
             if (t.equipement_id === eq.id && t.paye && isDateInPeriod(t.date_transaction, STATE.currentPeriod)) {
                 const amt = Number(t.montant) || 0;
-                eqTxList.push(t);
                 if (t.type_flux === "Recette") {
                     eqRec += amt;
                 } else {
@@ -6278,50 +6281,24 @@ function generatePartnerInvoice(assocName) {
                 pDep,
                 pNet
             });
-
-            eqTxList.forEach(t => {
-                if (!allTxList.some(x => x.id === t.id)) {
-                    allTxList.push({ ...t, eqNom: eq.nom, pct });
-                }
-            });
         }
     });
 
     let eqRowsHtml = "";
-    equipmentsBreakdown.forEach(item => {
-        const netColor = item.pNet >= 0 ? "#d97706" : "#059669";
-        const label = item.pNet >= 0 ? "Dû" : "À percevoir";
-        eqRowsHtml += `
-            <tr style="border-bottom: 1px solid #e2e8f0;">
-                <td style="padding: 10px; font-weight: 600; color: #0f172a;">🎪 ${item.eqNom} ${item.eqDesc ? `<br><small style="color: #64748b; font-weight: normal;">${item.eqDesc}</small>` : ''}</td>
-                <td style="padding: 10px; text-align: center; font-weight: 700; color: #475569;">${item.pct}%</td>
-                <td style="padding: 10px; text-align: right; color: #059669; font-weight: 600;">${item.eqRec.toFixed(2)} €</td>
-                <td style="padding: 10px; text-align: right; color: #dc2626; font-weight: 600;">${item.eqDep.toFixed(2)} €</td>
-                <td style="padding: 10px; text-align: right; font-weight: 700; color: #0f172a;">${item.eqNet.toFixed(2)} €</td>
-                <td style="padding: 10px; text-align: right; font-weight: 700; color: ${netColor};">${label}: ${Math.abs(item.pNet).toFixed(2)} €</td>
-            </tr>
-        `;
-    });
-
-    let txRowsHtml = "";
-    if (allTxList.length === 0) {
-        txRowsHtml = `<tr><td colspan="6" style="padding: 12px; text-align: center; color: #64748b;">Aucune opération enregistrée sur cet exercice.</td></tr>`;
+    if (equipmentsBreakdown.length === 0) {
+        eqRowsHtml = `<tr><td colspan="6" style="padding: 12px; text-align: center; color: #64748b;">Aucun équipement partagé rattaché à cet exercice.</td></tr>`;
     } else {
-        allTxList.forEach(t => {
-            const dateStr = formatDateFrench(new Date(t.date_transaction));
-            const isRec = t.type_flux === "Recette";
-            const amtColor = isRec ? "#059669" : "#dc2626";
-            const prefix = isRec ? "+" : "-";
-            const shareAmt = Number(t.montant) * (t.pct / 100);
-
-            txRowsHtml += `
-                <tr style="border-bottom: 1px solid #f1f5f9;">
-                    <td style="padding: 8px 10px; color: #475569;">${dateStr}</td>
-                    <td style="padding: 8px 10px; font-weight: 500; color: #0f172a;">${t.description}</td>
-                    <td style="padding: 8px 10px; color: #64748b;">${t.eqNom} (${t.pct}%)</td>
-                    <td style="padding: 8px 10px; text-align: center;"><span style="font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; background: ${isRec ? '#d1fae5' : '#fee2e2'}; color: ${isRec ? '#065f46' : '#991b1b'}; font-weight: 600;">${t.type_flux}</span></td>
-                    <td style="padding: 8px 10px; text-align: right; font-weight: 600; color: ${amtColor};">${prefix}${Number(t.montant).toFixed(2)} €</td>
-                    <td style="padding: 8px 10px; text-align: right; font-weight: 700; color: #0f172a;">${prefix}${shareAmt.toFixed(2)} €</td>
+        equipmentsBreakdown.forEach(item => {
+            const netColor = item.pNet >= 0 ? "#d97706" : "#059669";
+            const label = item.pNet >= 0 ? "Dû" : "À percevoir";
+            eqRowsHtml += `
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 10px; font-weight: 600; color: #0f172a;">🎪 ${item.eqNom} ${item.eqDesc ? `<br><small style="color: #64748b; font-weight: normal;">${item.eqDesc}</small>` : ''}</td>
+                    <td style="padding: 10px; text-align: center; font-weight: 700; color: #475569;">${item.pct}%</td>
+                    <td style="padding: 10px; text-align: right; color: #059669; font-weight: 600;">${item.eqRec.toFixed(2)} €</td>
+                    <td style="padding: 10px; text-align: right; color: #dc2626; font-weight: 600;">${item.eqDep.toFixed(2)} €</td>
+                    <td style="padding: 10px; text-align: right; font-weight: 700; color: #0f172a;">${item.eqNet.toFixed(2)} €</td>
+                    <td style="padding: 10px; text-align: right; font-weight: 700; color: ${netColor};">${label}: ${Math.abs(item.pNet).toFixed(2)} €</td>
                 </tr>
             `;
         });
@@ -6335,17 +6312,20 @@ function generatePartnerInvoice(assocName) {
 
     const htmlContent = `
         <div style="background: white; color: #0f172a; padding: 28px; border-radius: 8px; font-family: system-ui, -apple-system, sans-serif;">
-            <!-- Header -->
-            <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #4338ca; padding-bottom: 16px; margin-bottom: 20px;">
-                <div>
-                    <h1 style="color: #4338ca; margin: 0; font-size: 1.4rem; font-weight: 800;">FOYER RURAL D'ESNOMS AU VAL</h1>
-                    <div style="font-size: 0.85rem; color: #475569; margin-top: 4px;">
-                        Place de la Mairie, 52190 Esnoms-au-Val<br>
-                        Email : foyer.rural.esnoms@gmail.com
+            <!-- Header with Logo -->
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 16px; margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <img src="${logoSrc}" alt="Logo Foyer Rural" style="max-height: 65px; max-width: 140px; object-fit: contain;">
+                    <div>
+                        <h1 style="color: #4338ca; margin: 0; font-size: 1.35rem; font-weight: 800;">FOYER RURAL D'ESNOMS AU VAL</h1>
+                        <div style="font-size: 0.85rem; color: #475569; margin-top: 3px;">
+                            Place de la Mairie, 52190 Esnoms-au-Val<br>
+                            Email : foyer.rural.esnoms@gmail.com
+                        </div>
                     </div>
                 </div>
                 <div style="text-align: right;">
-                    <div style="font-size: 1rem; font-weight: 800; color: #1e1b4b; text-transform: uppercase;">${docTypeLabel}</div>
+                    <div style="font-size: 0.95rem; font-weight: 800; color: #1e1b4b; text-transform: uppercase;">${docTypeLabel}</div>
                     <div style="font-size: 0.85rem; color: #64748b; margin-top: 4px;">
                         Réf : <strong>FAC-INTER-${currentYear}-${(assocInfo.nom || assocName).replace(/\s+/g, '-').toUpperCase()}</strong><br>
                         Date d'émission : <strong>${todayStr}</strong><br>
@@ -6356,28 +6336,29 @@ function generatePartnerInvoice(assocName) {
 
             <!-- Recipient Box -->
             <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 20px;">
-                <div style="font-size: 0.72rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Association Partenaire Destinataire</div>
-                <div style="font-size: 1.05rem; font-weight: 700; color: #0f172a;">🏢 ${assocInfo.nom || assocName}</div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; font-size: 0.82rem; color: #334155;">
+                <div style="font-size: 0.72rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Association Partenaire Destinataire</div>
+                <div style="font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 8px;">🏢 ${assocInfo.nom || assocName}</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 0.83rem; color: #334155;">
                     <div>👤 <strong>Contact :</strong> ${assocInfo.contact || "Non renseigné"}</div>
-                    <div>✉️ <strong>Email / Tél :</strong> ${assocInfo.email || "Non renseigné"}</div>
-                    <div>📍 <strong>Adresse :</strong> ${assocInfo.adresse || "Non renseignée"}</div>
+                    <div>✉️ <strong>Email du Contact :</strong> ${assocInfo.email ? `<a href="mailto:${assocInfo.email}" style="color: #4338ca; text-decoration: none;">${assocInfo.email}</a>` : "Non renseigné"}</div>
+                    <div>📞 <strong>Téléphone :</strong> ${assocInfo.phone || "Non renseigné"}</div>
+                    <div>📍 <strong>Adresse Postale :</strong> ${assocInfo.adresse || "Non renseignée"}</div>
                     <div>🏢 <strong>SIRET / RNA :</strong> ${assocInfo.siret || "N/A"}</div>
                 </div>
             </div>
 
-            <!-- Section 1 -->
-            <h3 style="font-size: 0.95rem; color: #1e1b4b; margin-bottom: 10px; font-weight: 700;">1. Récapitulatif par Équipement Partagé (Période : ${currentYear})</h3>
+            <!-- Table: Summary by Shared Equipment -->
+            <h3 style="font-size: 0.95rem; color: #1e1b4b; margin-bottom: 10px; font-weight: 700;">Récapitulatif des Équipements Partagés & Ventilation Quotes-parts (Période : ${currentYear})</h3>
             
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.82rem;">
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 0.83rem;">
                 <thead>
                     <tr style="background: #f1f5f9; color: #334155; text-align: left;">
-                        <th style="padding: 8px; border-bottom: 2px solid #cbd5e1;">Équipement</th>
-                        <th style="padding: 8px; text-align: center; border-bottom: 2px solid #cbd5e1;">Quote-part</th>
-                        <th style="padding: 8px; text-align: right; border-bottom: 2px solid #cbd5e1;">Total Recettes</th>
-                        <th style="padding: 8px; text-align: right; border-bottom: 2px solid #cbd5e1;">Total Dépenses</th>
-                        <th style="padding: 8px; text-align: right; border-bottom: 2px solid #cbd5e1;">Net Matériel</th>
-                        <th style="padding: 8px; text-align: right; border-bottom: 2px solid #cbd5e1;">Part Partenaire</th>
+                        <th style="padding: 10px; border-bottom: 2px solid #cbd5e1;">Équipement Concerné</th>
+                        <th style="padding: 10px; text-align: center; border-bottom: 2px solid #cbd5e1;">Quote-part</th>
+                        <th style="padding: 10px; text-align: right; border-bottom: 2px solid #cbd5e1;">Total Recettes</th>
+                        <th style="padding: 10px; text-align: right; border-bottom: 2px solid #cbd5e1;">Total Dépenses</th>
+                        <th style="padding: 10px; text-align: right; border-bottom: 2px solid #cbd5e1;">Net Matériel</th>
+                        <th style="padding: 10px; text-align: right; border-bottom: 2px solid #cbd5e1;">Part Partenaire</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -6385,46 +6366,27 @@ function generatePartnerInvoice(assocName) {
                 </tbody>
             </table>
 
-            <!-- Section 2 -->
-            <h3 style="font-size: 0.95rem; color: #1e1b4b; margin-bottom: 10px; font-weight: 700;">2. Journal Détaillé des Opérations Comptables Rattachées</h3>
-
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.78rem;">
-                <thead>
-                    <tr style="background: #f1f5f9; color: #334155; text-align: left;">
-                        <th style="padding: 6px 8px; border-bottom: 2px solid #cbd5e1;">Date</th>
-                        <th style="padding: 6px 8px; border-bottom: 2px solid #cbd5e1;">Libellé / Opération</th>
-                        <th style="padding: 6px 8px; border-bottom: 2px solid #cbd5e1;">Équipement</th>
-                        <th style="padding: 6px 8px; text-align: center; border-bottom: 2px solid #cbd5e1;">Flux</th>
-                        <th style="padding: 6px 8px; text-align: right; border-bottom: 2px solid #cbd5e1;">Montant Total</th>
-                        <th style="padding: 6px 8px; text-align: right; border-bottom: 2px solid #cbd5e1;">Quote-part Partenaire</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${txRowsHtml}
-                </tbody>
-            </table>
-
             <!-- Summary Status Box -->
-            <div style="background: ${statusBoxBg}; border: 2px solid ${statusBoxBorder}; border-radius: 8px; padding: 16px; text-align: center; margin-bottom: 28px;">
-                <div style="font-size: 1.15rem; font-weight: 800; color: ${statusBoxTextColor}; margin-bottom: 4px;">
+            <div style="background: ${statusBoxBg}; border: 2px solid ${statusBoxBorder}; border-radius: 8px; padding: 18px; text-align: center; margin-bottom: 32px;">
+                <div style="font-size: 1.2rem; font-weight: 800; color: ${statusBoxTextColor}; margin-bottom: 4px;">
                     ${statusTextHeader}
                 </div>
-                <div style="font-size: 0.82rem; color: ${statusBoxTextColor};">
+                <div style="font-size: 0.85rem; color: ${statusBoxTextColor};">
                     ${totalAssocNet >= 0 ? "Document justificatif de recette à valoir pour la comptabilité de l'association partenaire." : "Document valant facture et pièce justificative de dépense pour la comptabilité de l'association partenaire."}
                 </div>
             </div>
 
             <!-- Signatures area -->
-            <div style="display: flex; justify-content: space-between; margin-top: 30px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 0.82rem; color: #475569;">
+            <div style="display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; border-top: 1px dashed #cbd5e1; font-size: 0.85rem; color: #475569;">
                 <div>
                     <strong>Pour le Foyer Rural d'Esnoms au Val</strong><br>
                     Le Trésorier / Le Président<br>
-                    <small>Signature & Cachet</small>
+                    <small style="color: #94a3b8;">Signature & Cachet</small>
                 </div>
                 <div style="text-align: right;">
                     <strong>Pour l'Association Partenaire</strong><br>
                     ${assocInfo.nom || assocName}<br>
-                    <small>Signature & Mention "Bon pour accord"</small>
+                    <small style="color: #94a3b8;">Signature & Mention "Bon pour accord"</small>
                 </div>
             </div>
         </div>
