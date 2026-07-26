@@ -3209,40 +3209,45 @@ function buildAndShowInvoice(customer, tx) {
     const invoiceHtml = `
         <div style="background: white; color: #0f172a; padding: 24px; border-radius: 8px; font-family: system-ui, -apple-system, sans-serif;">
             <!-- Header with Logo and Emitter Info -->
-            <div style="border-bottom: 2px solid #4338ca; padding-bottom: 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
-                <div style="display: flex; align-items: center; gap: 16px;">
+            <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 20px; border-bottom: 2px solid #4338ca; padding-bottom: 16px; margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; gap: 16px; flex: 1; min-width: 280px;">
                     <img src="${logoUrl}" alt="Logo" style="max-height: 65px; max-width: 130px; object-fit: contain;">
-                    <div>
-                        <input type="text" id="invoice-edit-emitter-name" value="${emitter.nom}" placeholder="Nom de l'Association" style="font-size: 1.2rem; font-weight: 800; color: #4338ca; border: 1px dashed #cbd5e1; background: transparent; padding: 2px 4px; width: 310px;" />
+                    <div style="flex: 1; min-width: 0;">
+                        <input type="text" id="invoice-edit-emitter-name" value="${emitter.nom}" placeholder="Nom de l'Association" style="font-size: 1.2rem; font-weight: 800; color: #4338ca; border: 1px dashed #cbd5e1; background: transparent; padding: 2px 4px; width: 100%; max-width: 320px; box-sizing: border-box;" />
                         <div>
-                            <input type="text" id="invoice-edit-emitter-status" value="${emitter.status}" placeholder="Mention légale" style="font-size: 0.8rem; color: #475569; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; width: 290px; margin-top: 2px;" />
+                            <input type="text" id="invoice-edit-emitter-status" value="${emitter.status}" placeholder="Mention légale" style="font-size: 0.8rem; color: #475569; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; width: 100%; max-width: 300px; margin-top: 2px; box-sizing: border-box;" />
                         </div>
                         <div>
-                            <input type="text" id="invoice-edit-emitter-adresse" value="${emitter.adresse}" placeholder="Adresse postale" style="font-size: 0.8rem; color: #475569; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; width: 290px; margin-top: 2px;" />
+                            <input type="text" id="invoice-edit-emitter-adresse" value="${emitter.adresse}" placeholder="Adresse postale" style="font-size: 0.8rem; color: #475569; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; width: 100%; max-width: 300px; margin-top: 2px; box-sizing: border-box;" />
                         </div>
-                        <div>
-                            <input type="text" id="invoice-edit-emitter-email" value="${emitter.email}" placeholder="Email" style="font-size: 0.8rem; color: #475569; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; width: 190px; margin-top: 2px;" />
+                        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                            <input type="text" id="invoice-edit-emitter-email" value="${emitter.email}" placeholder="Email" style="font-size: 0.8rem; color: #475569; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; width: 180px; margin-top: 2px;" />
                             <input type="text" id="invoice-edit-emitter-phone" value="${emitter.phone}" placeholder="Tél" style="font-size: 0.8rem; color: #475569; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; width: 110px; margin-top: 2px;" />
                         </div>
                     </div>
                 </div>
-                <div style="text-align: right; background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px 14px; border-radius: 8px; min-width: 270px;">
-                    <h2 style="font-size: 1.25rem; font-weight: 800; color: #1e1b4b; margin: 0 0 6px 0; text-transform: uppercase;">FACTURE</h2>
-                    <div style="font-size: 0.85rem; color: #1e293b; margin-bottom: 3px;">
-                        <strong style="color: #475569;">N° Facture :</strong> <input type="text" id="invoice-edit-num" value="${invoiceNum}" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 700; width: 140px; text-align: right; padding: 1px 4px; color: #0f172a;" />
-                    </div>
-                    <div style="font-size: 0.85rem; color: #1e293b; margin-bottom: 3px;">
-                        <strong style="color: #475569;">Date d'émission :</strong> <input type="text" id="invoice-edit-date" value="${invoiceDate}" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 600; width: 110px; text-align: right; padding: 1px 4px; color: #0f172a;" />
-                    </div>
-                    <div style="font-size: 0.85rem; color: #1e293b; margin-bottom: 3px;">
-                        <strong style="color: #475569;">Exercice comptable :</strong> <input type="text" id="invoice-edit-year" value="${STATE.currentPeriod || new Date().getFullYear()}" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 700; width: 60px; text-align: right; padding: 1px 4px; color: #4338ca;" />
-                    </div>
-                    <div style="font-size: 0.85rem; color: #1e293b; margin-top: 4px;">
-                        <strong style="color: #475569;">Statut :</strong>
-                        <select id="invoice-edit-status" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 800; color: ${isPaid ? '#059669' : '#d97706'}; padding: 2px 4px; font-size: 0.82rem;">
-                            <option value="PAYÉ" ${isPaid ? "selected" : ""}>PAYÉ</option>
-                            <option value="EN ATTENTE DE PAIEMENT" ${!isPaid ? "selected" : ""}>EN ATTENTE DE PAIEMENT</option>
-                        </select>
+                <div style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 12px 16px; border-radius: 8px; flex: 1; max-width: 360px; min-width: 270px; box-sizing: border-box; margin-left: auto;">
+                    <h2 style="font-size: 1.25rem; font-weight: 800; color: #1e1b4b; margin: 0 0 8px 0; text-transform: uppercase; text-align: right;">FACTURE</h2>
+                    <div style="font-size: 0.85rem; color: #1e293b; display: flex; flex-direction: column; gap: 6px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%;">
+                            <strong style="color: #475569; white-space: nowrap;">N° Facture :</strong>
+                            <input type="text" id="invoice-edit-num" value="${invoiceNum}" style="flex: 1; min-width: 0; border: 1px dashed #cbd5e1; background: transparent; font-weight: 700; text-align: right; padding: 2px 4px; color: #0f172a; font-family: inherit;" />
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%;">
+                            <strong style="color: #475569; white-space: nowrap;">Date d'émission :</strong>
+                            <input type="text" id="invoice-edit-date" value="${invoiceDate}" style="flex: 1; min-width: 0; border: 1px dashed #cbd5e1; background: transparent; font-weight: 600; text-align: right; padding: 2px 4px; color: #0f172a; font-family: inherit;" />
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%;">
+                            <strong style="color: #475569; white-space: nowrap;">Exercice comptable :</strong>
+                            <input type="text" id="invoice-edit-year" value="${STATE.currentPeriod || new Date().getFullYear()}" style="flex: 1; min-width: 0; border: 1px dashed #cbd5e1; background: transparent; font-weight: 800; text-align: right; padding: 2px 4px; color: #4338ca; font-family: inherit;" />
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; margin-top: 2px;">
+                            <strong style="color: #475569; white-space: nowrap;">Statut :</strong>
+                            <select id="invoice-edit-status" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 800; color: ${isPaid ? '#059669' : '#d97706'}; padding: 2px 4px; font-size: 0.82rem;">
+                                <option value="PAYÉ" ${isPaid ? "selected" : ""}>PAYÉ</option>
+                                <option value="EN ATTENTE DE PAIEMENT" ${!isPaid ? "selected" : ""}>EN ATTENTE DE PAIEMENT</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -6435,34 +6440,37 @@ function generatePartnerInvoice(assocName) {
     const htmlContent = `
         <div style="background: white; color: #0f172a; padding: 28px; border-radius: 8px; font-family: system-ui, -apple-system, sans-serif;">
             <!-- Header with Logo and Emitter Info -->
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 16px; margin-bottom: 20px;">
-                <div style="display: flex; align-items: center; gap: 16px;">
+            <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 20px; border-bottom: 2px solid #4338ca; padding-bottom: 16px; margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; gap: 16px; flex: 1; min-width: 280px;">
                     <img src="${logoSrc}" alt="Logo Foyer Rural" style="max-height: 65px; max-width: 130px; object-fit: contain;">
-                    <div>
-                        <input type="text" id="partner-inv-edit-emitter-nom" value="${emitter.nom}" placeholder="Nom de l'Association" style="font-size: 1.25rem; font-weight: 800; color: #4338ca; border: 1px dashed #cbd5e1; background: transparent; padding: 2px 4px; width: 310px;" />
+                    <div style="flex: 1; min-width: 0;">
+                        <input type="text" id="partner-inv-edit-emitter-nom" value="${emitter.nom}" placeholder="Nom de l'Association" style="font-size: 1.25rem; font-weight: 800; color: #4338ca; border: 1px dashed #cbd5e1; background: transparent; padding: 2px 4px; width: 100%; max-width: 320px; box-sizing: border-box;" />
                         <div>
-                            <input type="text" id="partner-inv-edit-emitter-status" value="${emitter.status}" placeholder="Mention légale" style="font-size: 0.8rem; color: #475569; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; width: 290px; margin-top: 2px;" />
+                            <input type="text" id="partner-inv-edit-emitter-status" value="${emitter.status}" placeholder="Mention légale" style="font-size: 0.8rem; color: #475569; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; width: 100%; max-width: 300px; margin-top: 2px; box-sizing: border-box;" />
                         </div>
                         <div>
-                            <input type="text" id="partner-inv-edit-emitter-adresse" value="${emitter.adresse}" placeholder="Adresse du siège" style="font-size: 0.8rem; color: #475569; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; width: 290px; margin-top: 2px;" />
+                            <input type="text" id="partner-inv-edit-emitter-adresse" value="${emitter.adresse}" placeholder="Adresse du siège" style="font-size: 0.8rem; color: #475569; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; width: 100%; max-width: 300px; margin-top: 2px; box-sizing: border-box;" />
                         </div>
-                        <div>
-                            <input type="text" id="partner-inv-edit-emitter-email" value="${emitter.email}" placeholder="Email" style="font-size: 0.8rem; color: #475569; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; width: 190px; margin-top: 2px;" />
+                        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                            <input type="text" id="partner-inv-edit-emitter-email" value="${emitter.email}" placeholder="Email" style="font-size: 0.8rem; color: #475569; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; width: 180px; margin-top: 2px;" />
                             <input type="text" id="partner-inv-edit-emitter-phone" value="${emitter.phone}" placeholder="Tél" style="font-size: 0.8rem; color: #475569; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; width: 110px; margin-top: 2px;" />
                         </div>
                     </div>
                 </div>
-                <div style="text-align: right; background: #f8fafc; border: 1px solid #cbd5e1; padding: 12px 16px; border-radius: 8px; min-width: 320px;">
-                    <input type="text" id="partner-inv-edit-doctype" value="${docTypeLabel}" style="font-size: 0.88rem; font-weight: 800; color: #1e1b4b; text-transform: uppercase; border: 1px dashed #cbd5e1; background: transparent; padding: 2px 4px; width: 100%; text-align: right;" />
-                    <div style="font-size: 0.85rem; color: #1e293b; margin-top: 8px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end;">
-                        <div>
-                            <strong style="color: #475569;">Référence :</strong> <input type="text" id="partner-inv-edit-ref" value="FAC-INTER-${currentYear}-${(assocInfo.nom || assocName).replace(/\s+/g, '-').toUpperCase()}" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 700; width: 210px; text-align: right; padding: 1px 4px; color: #0f172a;" />
+                <div style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 12px 16px; border-radius: 8px; flex: 1; max-width: 420px; min-width: 290px; box-sizing: border-box; margin-left: auto;">
+                    <textarea id="partner-inv-edit-doctype" rows="2" style="font-size: 0.9rem; font-weight: 800; color: #1e1b4b; text-transform: uppercase; border: 1px dashed #cbd5e1; background: transparent; padding: 2px 4px; width: 100%; text-align: right; font-family: inherit; line-height: 1.3; resize: vertical; box-sizing: border-box;">${docTypeLabel}</textarea>
+                    <div style="font-size: 0.85rem; color: #1e293b; margin-top: 8px; display: flex; flex-direction: column; gap: 6px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%;">
+                            <strong style="color: #475569; white-space: nowrap;">Référence :</strong>
+                            <input type="text" id="partner-inv-edit-ref" value="FAC-INTER-${currentYear}-${(assocInfo.nom || assocName).replace(/\s+/g, '-').toUpperCase()}" style="flex: 1; min-width: 0; border: 1px dashed #cbd5e1; background: transparent; font-weight: 700; text-align: right; padding: 2px 4px; color: #0f172a; font-family: inherit;" />
                         </div>
-                        <div>
-                            <strong style="color: #475569;">Date d'émission :</strong> <input type="text" id="partner-inv-edit-date" value="${todayStr}" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 600; width: 110px; text-align: right; padding: 1px 4px; color: #0f172a;" />
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%;">
+                            <strong style="color: #475569; white-space: nowrap;">Date d'émission :</strong>
+                            <input type="text" id="partner-inv-edit-date" value="${todayStr}" style="flex: 1; min-width: 0; border: 1px dashed #cbd5e1; background: transparent; font-weight: 600; text-align: right; padding: 2px 4px; color: #0f172a; font-family: inherit;" />
                         </div>
-                        <div>
-                            <strong style="color: #475569;">Exercice comptable :</strong> <input type="text" id="partner-inv-edit-year" value="${currentYear}" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 800; width: 75px; text-align: right; padding: 1px 4px; color: #4338ca;" />
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%;">
+                            <strong style="color: #475569; white-space: nowrap;">Exercice comptable :</strong>
+                            <input type="text" id="partner-inv-edit-year" value="${currentYear}" style="flex: 1; min-width: 0; border: 1px dashed #cbd5e1; background: transparent; font-weight: 800; text-align: right; padding: 2px 4px; color: #4338ca; font-family: inherit;" />
                         </div>
                     </div>
                 </div>
@@ -6473,14 +6481,14 @@ function generatePartnerInvoice(assocName) {
                 <div style="font-size: 0.72rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Association Partenaire Destinataire</div>
                 <input type="hidden" id="partner-inv-edit-assoc-id" value="${assocInfo.id || ''}">
                 <div style="font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-                    🏢 <input type="text" id="partner-inv-edit-assoc-nom" value="${assocInfo.nom || assocName}" placeholder="Nom de l'association partenaire" style="border: 1px dashed #cbd5e1; background: transparent; padding: 2px 6px; font-weight: 700; font-family: inherit; font-size: 1.05rem; width: 340px;" />
+                    🏢 <input type="text" id="partner-inv-edit-assoc-nom" value="${assocInfo.nom || assocName}" placeholder="Nom de l'association partenaire" style="border: 1px dashed #cbd5e1; background: transparent; padding: 2px 6px; font-weight: 700; font-family: inherit; font-size: 1.05rem; width: 100%; max-width: 400px; box-sizing: border-box;" />
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.83rem; color: #334155;">
-                    <div>👤 <strong>Contact :</strong> <input type="text" id="partner-inv-edit-assoc-contact" value="${assocInfo.contact || ''}" placeholder="Nom du contact" style="border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; font-family: inherit; font-size: 0.83rem; width: 170px;" /></div>
-                    <div>✉️ <strong>Email du Contact :</strong> <input type="email" id="partner-inv-edit-assoc-email" value="${assocInfo.email || ''}" placeholder="email@exemple.fr" style="border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; font-family: inherit; font-size: 0.83rem; width: 190px;" /></div>
-                    <div>📞 <strong>Téléphone :</strong> <input type="text" id="partner-inv-edit-assoc-phone" value="${assocInfo.phone || ''}" placeholder="06 XX XX XX XX" style="border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; font-family: inherit; font-size: 0.83rem; width: 150px;" /></div>
-                    <div>📍 <strong>Adresse Postale :</strong> <input type="text" id="partner-inv-edit-assoc-adresse" value="${assocInfo.adresse || ''}" placeholder="Adresse complète" style="border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; font-family: inherit; font-size: 0.83rem; width: 220px;" /></div>
-                    <div style="grid-column: span 2;">🏢 <strong>SIRET / RNA :</strong> <input type="text" id="partner-inv-edit-assoc-siret" value="${assocInfo.siret || ''}" placeholder="SIRET ou W..." style="border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; font-family: inherit; font-size: 0.83rem; width: 180px;" /></div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; font-size: 0.83rem; color: #334155;">
+                    <div style="display: flex; align-items: center; gap: 4px;">👤 <strong>Contact :</strong> <input type="text" id="partner-inv-edit-assoc-contact" value="${assocInfo.contact || ''}" placeholder="Nom du contact" style="flex: 1; min-width: 0; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; font-family: inherit; font-size: 0.83rem;" /></div>
+                    <div style="display: flex; align-items: center; gap: 4px;">✉️ <strong>Email :</strong> <input type="email" id="partner-inv-edit-assoc-email" value="${assocInfo.email || ''}" placeholder="email@exemple.fr" style="flex: 1; min-width: 0; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; font-family: inherit; font-size: 0.83rem;" /></div>
+                    <div style="display: flex; align-items: center; gap: 4px;">📞 <strong>Tél :</strong> <input type="text" id="partner-inv-edit-assoc-phone" value="${assocInfo.phone || ''}" placeholder="06 XX XX XX XX" style="flex: 1; min-width: 0; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; font-family: inherit; font-size: 0.83rem;" /></div>
+                    <div style="display: flex; align-items: center; gap: 4px;">📍 <strong>Adresse :</strong> <input type="text" id="partner-inv-edit-assoc-adresse" value="${assocInfo.adresse || ''}" placeholder="Adresse complète" style="flex: 1; min-width: 0; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; font-family: inherit; font-size: 0.83rem;" /></div>
+                    <div style="display: flex; align-items: center; gap: 4px; grid-column: 1 / -1;">🏢 <strong>SIRET / RNA :</strong> <input type="text" id="partner-inv-edit-assoc-siret" value="${assocInfo.siret || ''}" placeholder="SIRET ou W..." style="flex: 1; max-width: 260px; min-width: 0; border: 1px dashed #cbd5e1; background: transparent; padding: 1px 4px; font-family: inherit; font-size: 0.83rem;" /></div>
                 </div>
             </div>
 
