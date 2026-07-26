@@ -3226,17 +3226,20 @@ function buildAndShowInvoice(customer, tx) {
                         </div>
                     </div>
                 </div>
-                <div style="text-align: right;">
-                    <h2 style="font-size: 1.25rem; font-weight: 800; color: #1e1b4b; margin: 0 0 6px 0;">FACTURE</h2>
-                    <div style="font-size: 0.82rem; color: #475569; margin-bottom: 2px;">
-                        <strong>N° Facture :</strong> <input type="text" id="invoice-edit-num" value="${invoiceNum}" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 700; width: 140px; text-align: right; padding: 1px 4px;" />
+                <div style="text-align: right; background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px 14px; border-radius: 8px; min-width: 270px;">
+                    <h2 style="font-size: 1.25rem; font-weight: 800; color: #1e1b4b; margin: 0 0 6px 0; text-transform: uppercase;">FACTURE</h2>
+                    <div style="font-size: 0.85rem; color: #1e293b; margin-bottom: 3px;">
+                        <strong style="color: #475569;">N° Facture :</strong> <input type="text" id="invoice-edit-num" value="${invoiceNum}" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 700; width: 140px; text-align: right; padding: 1px 4px; color: #0f172a;" />
                     </div>
-                    <div style="font-size: 0.82rem; color: #475569; margin-bottom: 2px;">
-                        <strong>Date :</strong> <input type="text" id="invoice-edit-date" value="${invoiceDate}" style="border: 1px dashed #cbd5e1; background: transparent; width: 110px; text-align: right; padding: 1px 4px;" />
+                    <div style="font-size: 0.85rem; color: #1e293b; margin-bottom: 3px;">
+                        <strong style="color: #475569;">Date d'émission :</strong> <input type="text" id="invoice-edit-date" value="${invoiceDate}" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 600; width: 110px; text-align: right; padding: 1px 4px; color: #0f172a;" />
                     </div>
-                    <div style="font-size: 0.82rem; color: #475569; margin-top: 4px;">
-                        <strong>Statut :</strong>
-                        <select id="invoice-edit-status" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 700; color: ${isPaid ? '#059669' : '#d97706'}; padding: 2px 4px; font-size: 0.8rem;">
+                    <div style="font-size: 0.85rem; color: #1e293b; margin-bottom: 3px;">
+                        <strong style="color: #475569;">Exercice comptable :</strong> <input type="text" id="invoice-edit-year" value="${STATE.currentPeriod || new Date().getFullYear()}" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 700; width: 60px; text-align: right; padding: 1px 4px; color: #4338ca;" />
+                    </div>
+                    <div style="font-size: 0.85rem; color: #1e293b; margin-top: 4px;">
+                        <strong style="color: #475569;">Statut :</strong>
+                        <select id="invoice-edit-status" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 800; color: ${isPaid ? '#059669' : '#d97706'}; padding: 2px 4px; font-size: 0.82rem;">
                             <option value="PAYÉ" ${isPaid ? "selected" : ""}>PAYÉ</option>
                             <option value="EN ATTENTE DE PAIEMENT" ${!isPaid ? "selected" : ""}>EN ATTENTE DE PAIEMENT</option>
                         </select>
@@ -6449,12 +6452,18 @@ function generatePartnerInvoice(assocName) {
                         </div>
                     </div>
                 </div>
-                <div style="text-align: right;">
-                    <input type="text" id="partner-inv-edit-doctype" value="${docTypeLabel}" style="font-size: 0.88rem; font-weight: 800; color: #1e1b4b; text-transform: uppercase; border: 1px dashed #cbd5e1; background: transparent; padding: 2px 4px; width: 330px; text-align: right;" />
-                    <div style="font-size: 0.83rem; color: #64748b; margin-top: 6px;">
-                        Réf : <input type="text" id="partner-inv-edit-ref" value="FAC-INTER-${currentYear}-${(assocInfo.nom || assocName).replace(/\s+/g, '-').toUpperCase()}" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 700; width: 210px; text-align: right; padding: 1px 4px;" /><br>
-                        Date d'émission : <input type="text" id="partner-inv-edit-date" value="${todayStr}" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 600; width: 110px; text-align: right; padding: 1px 4px; margin-top: 2px;" /><br>
-                        Exercice comptable : <input type="text" id="partner-inv-edit-year" value="${currentYear}" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 600; width: 60px; text-align: right; padding: 1px 4px; margin-top: 2px;" />
+                <div style="text-align: right; background: #f8fafc; border: 1px solid #cbd5e1; padding: 12px 16px; border-radius: 8px; min-width: 320px;">
+                    <input type="text" id="partner-inv-edit-doctype" value="${docTypeLabel}" style="font-size: 0.88rem; font-weight: 800; color: #1e1b4b; text-transform: uppercase; border: 1px dashed #cbd5e1; background: transparent; padding: 2px 4px; width: 100%; text-align: right;" />
+                    <div style="font-size: 0.85rem; color: #1e293b; margin-top: 8px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end;">
+                        <div>
+                            <strong style="color: #475569;">Référence :</strong> <input type="text" id="partner-inv-edit-ref" value="FAC-INTER-${currentYear}-${(assocInfo.nom || assocName).replace(/\s+/g, '-').toUpperCase()}" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 700; width: 210px; text-align: right; padding: 1px 4px; color: #0f172a;" />
+                        </div>
+                        <div>
+                            <strong style="color: #475569;">Date d'émission :</strong> <input type="text" id="partner-inv-edit-date" value="${todayStr}" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 600; width: 110px; text-align: right; padding: 1px 4px; color: #0f172a;" />
+                        </div>
+                        <div>
+                            <strong style="color: #475569;">Exercice comptable :</strong> <input type="text" id="partner-inv-edit-year" value="${currentYear}" style="border: 1px dashed #cbd5e1; background: transparent; font-weight: 800; width: 75px; text-align: right; padding: 1px 4px; color: #4338ca;" />
+                        </div>
                     </div>
                 </div>
             </div>
