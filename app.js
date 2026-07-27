@@ -7304,7 +7304,7 @@ function parseAndImportExcelFile(file) {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array', cellDates: true });
 
-            let countTx = 0, countAdh = 0, countMan = 0, countInv = 0;
+            let countTx = 0, countSkippedTx = 0, countAdh = 0, countMan = 0, countInv = 0;
 
             workbook.SheetNames.forEach((sheetName, sheetIndex) => {
                 const sheet = workbook.Sheets[sheetName];
@@ -7351,6 +7351,19 @@ function parseAndImportExcelFile(file) {
                         const catName = String(r[catIdx] || "").trim();
                         const desc = String(descRaw || "").trim() || "Transaction importée Excel";
                         const totalAmt = parseExcelNumValue(totalRaw);
+
+                        // Deduplication check: same date, same amount, same description
+                        const isDuplicateTx = (STATE.transactions || []).some(t => {
+                            const sameDate = t.date_transaction === dateStr;
+                            const sameAmt = Math.abs(Number(t.montant) - totalAmt) < 0.01;
+                            const sameDesc = (t.description || "").trim().toLowerCase() === desc.trim().toLowerCase();
+                            return sameDate && sameAmt && sameDesc;
+                        });
+
+                        if (isDuplicateTx) {
+                            countSkippedTx++;
+                            continue;
+                        }
                         const qty = parseExcelNumValue(r[qtyIdx]) || 1;
                         const priceUnit = parseExcelNumValue(r[priceIdx]) || (qty > 0 ? totalAmt / qty : totalAmt);
                         const moyenPay = String(r[moyenIdx] || "Chèque").trim();
@@ -7586,12 +7599,40 @@ function parseAndImportExcelFile(file) {
 
             refreshAllViews();
 
-            alert(`✅ Importation Excel terminée avec succès !\n\nRécapitulatif des données importées :\n• ${countTx} transactions comptables\n• ${countAdh} adhérents\n• ${countMan} manifestations\n• ${countInv} investissements`);
+            alert(`✅ Importation Excel terminée avec succès !\n\nRécapitulatif des données importées :\n• ${countTx} nouvelles transactions comptables (${countSkippedTx} ignorées car déjà existantes)\n• ${countAdh} adhérents importés/mis à jour\n• ${countMan} manifestations importées/mises à jour\n• ${countInv} investissements importés/mis à jour`);
         } catch(err) {
             console.error("Erreur d'importation Excel:", err);
             alert("Erreur lors de la lecture du fichier Excel : " + err.message);
         }
     };
     reader.readAsArrayBuffer(file);
+}
+
+function resetDatabaseForTesting() {
+    if (!confirm("⚠️ ATTENTION RÉINITIALISATION (RAZ) :\n\nVoulez-vous vraiment effacer TOUTES les données (transactions, adhérents, manifestations, investissements) ?\n\nCette action va réinitialiser vos données pour vous permettre de tester vos fichiers d'importation Excel à zéro.\n\nConfirmer la remise à zéro ?")) {
+        return;
+    }
+
+    if (dbMode === 'firebase') {
+        const collections = ["transactions", "adherents", "manifestations", "investissements"];
+        collections.forEach(colName => {
+            db.collection(colName).get().then(snapshot => {
+                snapshot.forEach(doc => doc.ref.delete());
+            }).catch(err => console.error("Erreur effacement " + colName, err));
+        });
+    }
+
+    STATE.transactions = [];
+    STATE.adherents = [];
+    STATE.manifestations = [];
+    STATE.investissements = [];
+
+    if (dbMode === 'local') {
+        saveState();
+    }
+
+    refreshAllViews();
+
+    alert("🧹 Remise à Zéro (RAZ) effectuée ! La base de données a été réinitialisée à zéro pour vos tests d'importation.");
 }
 
