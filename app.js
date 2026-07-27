@@ -7035,3 +7035,473 @@ function deleteSharedEquipment(id) {
     }
 }
 
+// ============================================================================
+// --- EXCEL IMPORT / EXPORT MODULE (.XLSX) ---
+// ============================================================================
+
+function downloadExcelTemplate() {
+    if (typeof XLSX === 'undefined') {
+        alert("La bibliothèque Excel (SheetJS) n'est pas encore chargée. Veuillez patienter ou vérifier votre connexion internet.");
+        return;
+    }
+
+    const wb = XLSX.utils.book_new();
+
+    // 1. Sheet: Transactions
+    const txHeaders = [
+        "Date (AAAA-MM-JJ)", "Type (Recette/Dépense)", "Catégorie", "Description",
+        "Montant (€)", "Quantité", "Prix Unitaire (€)", "Moyen de Paiement",
+        "Statut (Payé/En attente)", "N° de Chèque", "Chèque Encaissé (Oui/Non)",
+        "Adhérent (Nom Prénom)", "Manifestation", "Équipement"
+    ];
+    const txData = [
+        txHeaders,
+        [
+            "2025-01-15", "Recette", "Cotisations Adhérents", "Cotisation annuelle Jean Dupont",
+            "20.00", "1", "20.00", "Chèque",
+            "Payé", "1234567", "Oui",
+            "Jean Dupont", "", ""
+        ],
+        [
+            "2025-03-14", "Dépense", "Buffet / Buvette", "Achat boissons Métro pour Loto",
+            "320.00", "1", "320.00", "Carte Bancaire",
+            "Payé", "", "Non",
+            "", "Loto 2025", ""
+        ]
+    ];
+    const wsTx = XLSX.utils.aoa_to_sheet(txData);
+
+    // 2. Sheet: Adhérents
+    const adhHeaders = [
+        "Nom", "Prénom", "Email", "Téléphone", "Adresse",
+        "Date d'adhésion (AAAA-MM-JJ)", "Cotisation Réglée (Oui/Non)", "Section"
+    ];
+    const adhData = [
+        adhHeaders,
+        ["Dupont", "Jean", "jean.dupont@email.fr", "06 12 34 56 78", "12 Rue du Val, Esnoms", "2025-01-15", "Oui", "Général"]
+    ];
+    const wsAdh = XLSX.utils.aoa_to_sheet(adhData);
+
+    // 3. Sheet: Manifestations
+    const manHeaders = ["Nom Événement", "Date Début (AAAA-MM-JJ)", "Date Fin (AAAA-MM-JJ)", "Description", "Statut (Terminée/En cours)"];
+    const manData = [
+        manHeaders,
+        ["Loto 2025", "2025-03-14", "2025-03-14", "Loto annuel de printemps du Foyer Rural", "Terminée"]
+    ];
+    const wsMan = XLSX.utils.aoa_to_sheet(manData);
+
+    // 4. Sheet: Investissements
+    const invHeaders = [
+        "Libellé Matériel", "Date Acquisition (AAAA-MM-JJ)", "Montant Achat (€)",
+        "Durée Amortissement (ans)", "État (Neuf/Occasion)", "Moyen de Paiement",
+        "N° de Chèque", "Chèque Encaissé (Oui/Non)"
+    ];
+    const invData = [
+        invHeaders,
+        ["Réfrigérateur Réserve", "2025-02-10", "450.00", "5", "Neuf", "Chèque", "7654321", "Oui"]
+    ];
+    const wsInv = XLSX.utils.aoa_to_sheet(invData);
+
+    // Append sheets to workbook
+    XLSX.utils.book_append_sheet(wb, wsTx, "Transactions");
+    XLSX.utils.book_append_sheet(wb, wsAdh, "Adhérents");
+    XLSX.utils.book_append_sheet(wb, wsMan, "Manifestations");
+    XLSX.utils.book_append_sheet(wb, wsInv, "Investissements");
+
+    // Write file
+    XLSX.writeFile(wb, "Modele_Historique_Foyer_Rural.xlsx");
+}
+
+function exportFullDatabaseToExcel() {
+    if (typeof XLSX === 'undefined') {
+        alert("La bibliothèque Excel (SheetJS) n'est pas encore chargée.");
+        return;
+    }
+
+    const wb = XLSX.utils.book_new();
+
+    // 1. Transactions
+    const txHeaders = [
+        "Date (AAAA-MM-JJ)", "Type (Recette/Dépense)", "Catégorie", "Description",
+        "Montant (€)", "Quantité", "Prix Unitaire (€)", "Moyen de Paiement",
+        "Statut (Payé/En attente)", "N° de Chèque", "Chèque Encaissé (Oui/Non)",
+        "Adhérent (Nom Prénom)", "Manifestation", "Équipement"
+    ];
+    const txRows = (STATE.transactions || []).map(t => {
+        const cat = (STATE.categories || []).find(c => c.id === t.categorie_id);
+        const adh = (STATE.adherents || []).find(a => a.id === t.adherent_id);
+        const man = (STATE.manifestations || []).find(m => m.id === t.manifestation_id);
+        const eq = (STATE.sharedEquipments || []).find(e => e.id === t.shared_equipment_id);
+
+        const adhName = adh ? `${adh.nom} ${adh.prenom}`.trim() : "";
+        const manName = man ? man.nom : "";
+        const eqName = eq ? eq.nom : "";
+
+        return [
+            t.date_transaction || "",
+            t.type_flux || "Dépense",
+            cat ? cat.nom : "",
+            t.description || "",
+            Number(t.montant || 0).toFixed(2),
+            t.quantite || 1,
+            Number(t.prix || t.montant || 0).toFixed(2),
+            t.moyen_payement || "Chèque",
+            t.paye ? "Payé" : "En attente",
+            t.num_cheque || "",
+            t.cheque_encaisse ? "Oui" : "Non",
+            adhName,
+            manName,
+            eqName
+        ];
+    });
+    const wsTx = XLSX.utils.aoa_to_sheet([txHeaders, ...txRows]);
+
+    // 2. Adhérents
+    const adhHeaders = [
+        "Nom", "Prénom", "Email", "Téléphone", "Adresse",
+        "Date d'adhésion (AAAA-MM-JJ)", "Cotisation Réglée (Oui/Non)", "Section"
+    ];
+    const adhRows = (STATE.adherents || []).map(a => [
+        a.nom || "", a.prenom || "", a.email || "", a.telephone || "", a.adresse || "",
+        a.date_adhesion || "", a.cotisation_reglee ? "Oui" : "Non", a.section || "Général"
+    ]);
+    const wsAdh = XLSX.utils.aoa_to_sheet([adhHeaders, ...adhRows]);
+
+    // 3. Manifestations
+    const manHeaders = ["Nom Événement", "Date Début (AAAA-MM-JJ)", "Date Fin (AAAA-MM-JJ)", "Description", "Statut (Terminée/En cours)"];
+    const manRows = (STATE.manifestations || []).map(m => [
+        m.nom || "", m.date_debut || "", m.date_fin || "", m.description || "", m.statut || "Terminée"
+    ]);
+    const wsMan = XLSX.utils.aoa_to_sheet([manHeaders, ...manRows]);
+
+    // 4. Investissements
+    const invHeaders = [
+        "Libellé Matériel", "Date Acquisition (AAAA-MM-JJ)", "Montant Achat (€)",
+        "Durée Amortissement (ans)", "État (Neuf/Occasion)", "Moyen de Paiement",
+        "N° de Chèque", "Chèque Encaissé (Oui/Non)"
+    ];
+    const invRows = (STATE.investissements || []).map(i => [
+        i.libelle || "", i.date_acquisition || "", Number(i.montant_achat || 0).toFixed(2),
+        i.duree_amortissement_ans || 0, i.etat || "Neuf", i.moyen_payement || "Virement",
+        i.num_cheque || "", i.cheque_encaisse ? "Oui" : "Non"
+    ]);
+    const wsInv = XLSX.utils.aoa_to_sheet([invHeaders, ...invRows]);
+
+    XLSX.utils.book_append_sheet(wb, wsTx, "Transactions");
+    XLSX.utils.book_append_sheet(wb, wsAdh, "Adhérents");
+    XLSX.utils.book_append_sheet(wb, wsMan, "Manifestations");
+    XLSX.utils.book_append_sheet(wb, wsInv, "Investissements");
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `Donnees_Completes_Foyer_Rural_${todayStr}.xlsx`);
+}
+
+// Drag & Drop handlers for Excel Drop Zone
+function handleExcelDragOver(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const zone = document.getElementById("excel-drop-zone");
+    if (zone) {
+        zone.style.borderColor = "var(--secondary)";
+        zone.style.background = "rgba(16, 185, 129, 0.08)";
+    }
+}
+
+function handleExcelDragLeave(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const zone = document.getElementById("excel-drop-zone");
+    if (zone) {
+        zone.style.borderColor = "var(--primary)";
+        zone.style.background = "rgba(99, 102, 241, 0.04)";
+    }
+}
+
+function handleExcelDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const zone = document.getElementById("excel-drop-zone");
+    if (zone) {
+        zone.style.borderColor = "var(--primary)";
+        zone.style.background = "rgba(99, 102, 241, 0.04)";
+    }
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+        parseAndImportExcelFile(files[0]);
+    }
+}
+
+function importExcelDatabase(e) {
+    const file = e.target.files[0];
+    if (file) {
+        parseAndImportExcelFile(file);
+    }
+}
+
+function parseExcelDateValue(val) {
+    if (!val) return new Date().toISOString().split('T')[0];
+    if (typeof val === 'number') {
+        if (typeof XLSX !== 'undefined' && XLSX.SSF) {
+            const dateObj = XLSX.SSF.parse_date_code(val);
+            if (dateObj) {
+                const y = dateObj.y;
+                const m = String(dateObj.m).padStart(2, '0');
+                const d = String(dateObj.d).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            }
+        }
+    }
+    const str = String(val).trim();
+    if (str.includes('/')) {
+        const parts = str.split('/');
+        if (parts.length === 3) {
+            const d = parts[0].padStart(2, '0');
+            const m = parts[1].padStart(2, '0');
+            const y = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+            return `${y}-${m}-${d}`;
+        }
+    }
+    if (str.match(/^\d{4}-\d{2}-\d{2}/)) {
+        return str.substring(0, 10);
+    }
+    return str;
+}
+
+function parseExcelBoolValue(val) {
+    if (typeof val === 'boolean') return val;
+    if (!val) return false;
+    const s = String(val).trim().toLowerCase();
+    return s === 'oui' || s === 'true' || s === '1' || s === 'vrai';
+}
+
+function parseExcelNumValue(val) {
+    if (typeof val === 'number') return val;
+    if (!val) return 0;
+    const cleaned = String(val).replace(',', '.').replace(/[^0-9.-]/g, '');
+    return parseFloat(cleaned) || 0;
+}
+
+function parseAndImportExcelFile(file) {
+    if (typeof XLSX === 'undefined') {
+        alert("La bibliothèque Excel (SheetJS) n'est pas disponible.");
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+
+            let countTx = 0, countAdh = 0, countMan = 0, countInv = 0;
+
+            workbook.SheetNames.forEach(sheetName => {
+                const sheet = workbook.Sheets[sheetName];
+                const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+
+                if (!rows || rows.length <= 1) return;
+
+                const nameLower = sheetName.toLowerCase();
+
+                // 1. Sheet: Transactions
+                if (nameLower.includes("transaction") || nameLower.includes("compta") || nameLower.includes("dépense") || nameLower.includes("recette")) {
+                    for (let i = 1; i < rows.length; i++) {
+                        const r = rows[i];
+                        if (!r || r.length === 0 || (!r[0] && !r[3] && !r[4])) continue;
+
+                        const dateStr = parseExcelDateValue(r[0]);
+                        const typeFlux = String(r[1] || "").trim().toLowerCase().includes("recette") ? "Recette" : "Dépense";
+                        const catName = String(r[2] || "").trim();
+                        const desc = String(r[3] || "").trim() || "Transaction importée Excel";
+                        const totalAmt = parseExcelNumValue(r[4]);
+                        const qty = parseExcelNumValue(r[5]) || 1;
+                        const priceUnit = parseExcelNumValue(r[6]) || (qty > 0 ? totalAmt / qty : totalAmt);
+                        const moyenPay = String(r[7] || "Chèque").trim();
+                        const statusStr = String(r[8] || "Payé").trim();
+                        const numCheque = String(r[9] || "").trim();
+                        const chequeEnc = parseExcelBoolValue(r[10]);
+                        const adhRef = String(r[11] || "").trim();
+                        const manRef = String(r[12] || "").trim();
+                        const eqRef = String(r[13] || "").trim();
+
+                        // Resolve or create Category
+                        let catObj = (STATE.categories || []).find(c => c.nom.toLowerCase() === catName.toLowerCase());
+                        if (!catObj && catName) {
+                            catObj = {
+                                id: "cat-" + Date.now() + Math.random().toString(36).substr(2, 4),
+                                nom: catName,
+                                type: typeFlux,
+                                code_comptable: "600"
+                            };
+                            STATE.categories.push(catObj);
+                            if (dbMode === 'firebase') {
+                                db.collection("categories").doc(catObj.id).set(catObj).catch(err => console.error(err));
+                            }
+                        }
+                        const catId = catObj ? catObj.id : (typeFlux === "Recette" ? "cat-1" : "cat-5");
+
+                        // Resolve linked objects
+                        let adhId = "";
+                        if (adhRef) {
+                            const foundAdh = (STATE.adherents || []).find(a => `${a.nom} ${a.prenom}`.toLowerCase().includes(adhRef.toLowerCase()) || `${a.prenom} ${a.nom}`.toLowerCase().includes(adhRef.toLowerCase()));
+                            if (foundAdh) adhId = foundAdh.id;
+                        }
+
+                        let manId = "";
+                        if (manRef) {
+                            const foundMan = (STATE.manifestations || []).find(m => m.nom.toLowerCase().includes(manRef.toLowerCase()));
+                            if (foundMan) manId = foundMan.id;
+                        }
+
+                        let eqId = "";
+                        if (eqRef) {
+                            const foundEq = (STATE.sharedEquipments || []).find(e => e.nom.toLowerCase().includes(eqRef.toLowerCase()));
+                            if (foundEq) eqId = foundEq.id;
+                        }
+
+                        const newTx = {
+                            id: "tx-" + Date.now() + Math.random().toString(36).substr(2, 5),
+                            type_flux: typeFlux,
+                            date_transaction: dateStr,
+                            categorie_id: catId,
+                            description: desc,
+                            montant: totalAmt,
+                            quantite: qty,
+                            prix: priceUnit,
+                            moyen_payement: moyenPay,
+                            paye: !statusStr.toLowerCase().includes("attente"),
+                            num_cheque: numCheque,
+                            cheque_encaisse: chequeEnc,
+                            adherent_id: adhId,
+                            manifestation_id: manId,
+                            shared_equipment_id: eqId
+                        };
+
+                        STATE.transactions.push(newTx);
+                        if (dbMode === 'firebase') {
+                            db.collection("transactions").doc(newTx.id).set(newTx).catch(err => console.error(err));
+                        }
+                        countTx++;
+                    }
+                }
+
+                // 2. Sheet: Adhérents
+                else if (nameLower.includes("adhérent") || nameLower.includes("adherant") || nameLower.includes("adherent") || nameLower.includes("membre")) {
+                    for (let i = 1; i < rows.length; i++) {
+                        const r = rows[i];
+                        if (!r || (!r[0] && !r[1])) continue;
+
+                        const nom = String(r[0] || "").trim();
+                        const prenom = String(r[1] || "").trim();
+                        const email = String(r[2] || "").trim();
+                        const tel = String(r[3] || "").trim();
+                        const adresse = String(r[4] || "").trim();
+                        const dateAdh = parseExcelDateValue(r[5]);
+                        const cotisReg = parseExcelBoolValue(r[6]);
+                        const section = String(r[7] || "Général").trim();
+
+                        const existing = (STATE.adherents || []).find(a => (a.nom.toLowerCase() === nom.toLowerCase() && a.prenom.toLowerCase() === prenom.toLowerCase()) || (email && a.email.toLowerCase() === email.toLowerCase()));
+
+                        if (existing) {
+                            existing.telephone = tel || existing.telephone;
+                            existing.adresse = adresse || existing.adresse;
+                            existing.date_adhesion = dateAdh || existing.date_adhesion;
+                            existing.cotisation_reglee = cotisReg;
+                            existing.section = section;
+                            if (dbMode === 'firebase') {
+                                db.collection("adherents").doc(existing.id).set(existing).catch(err => console.error(err));
+                            }
+                        } else {
+                            const newAdh = {
+                                id: "adh-" + Date.now() + Math.random().toString(36).substr(2, 4),
+                                nom, prenom, email, telephone: tel, adresse, date_adhesion: dateAdh, cotisation_reglee: cotisReg, section
+                            };
+                            STATE.adherents.push(newAdh);
+                            if (dbMode === 'firebase') {
+                                db.collection("adherents").doc(newAdh.id).set(newAdh).catch(err => console.error(err));
+                            }
+                        }
+                        countAdh++;
+                    }
+                }
+
+                // 3. Sheet: Manifestations
+                else if (nameLower.includes("manifestation") || nameLower.includes("événement") || nameLower.includes("fête") || nameLower.includes("event")) {
+                    for (let i = 1; i < rows.length; i++) {
+                        const r = rows[i];
+                        if (!r || !r[0]) continue;
+
+                        const nom = String(r[0] || "").trim();
+                        const dateDeb = parseExcelDateValue(r[1]);
+                        const dateFin = parseExcelDateValue(r[2]);
+                        const desc = String(r[3] || "").trim();
+                        const statut = String(r[4] || "Terminée").trim();
+
+                        const existing = (STATE.manifestations || []).find(m => m.nom.toLowerCase() === nom.toLowerCase());
+                        if (existing) {
+                            existing.date_debut = dateDeb;
+                            existing.date_fin = dateFin;
+                            existing.description = desc;
+                            existing.statut = statut;
+                            if (dbMode === 'firebase') {
+                                db.collection("manifestations").doc(existing.id).set(existing).catch(err => console.error(err));
+                            }
+                        } else {
+                            const newMan = {
+                                id: "man-" + Date.now() + Math.random().toString(36).substr(2, 4),
+                                nom, date_debut: dateDeb, date_fin: dateFin, description: desc, statut
+                            };
+                            STATE.manifestations.push(newMan);
+                            if (dbMode === 'firebase') {
+                                db.collection("manifestations").doc(newMan.id).set(newMan).catch(err => console.error(err));
+                            }
+                        }
+                        countMan++;
+                    }
+                }
+
+                // 4. Sheet: Investissements
+                else if (nameLower.includes("invest") || nameLower.includes("matériel") || nameLower.includes("équipement")) {
+                    for (let i = 1; i < rows.length; i++) {
+                        const r = rows[i];
+                        if (!r || !r[0]) continue;
+
+                        const libelle = String(r[0] || "").trim();
+                        const dateAcq = parseExcelDateValue(r[1]);
+                        const montant = parseExcelNumValue(r[2]);
+                        const duree = parseExcelNumValue(r[3]) || 0;
+                        const etat = String(r[4] || "Neuf").trim();
+                        const moyen = String(r[5] || "Virement").trim();
+                        const numCheque = String(r[6] || "").trim();
+                        const chequeEnc = parseExcelBoolValue(r[7]);
+
+                        const newInv = {
+                            id: "inv-" + Date.now() + Math.random().toString(36).substr(2, 4),
+                            libelle, date_acquisition: dateAcq, montant_achat: montant,
+                            duree_amortissement_ans: duree, etat, moyen_payement: moyen,
+                            num_cheque: numCheque, cheque_encaisse: chequeEnc
+                        };
+                        STATE.investissements.push(newInv);
+                        if (dbMode === 'firebase') {
+                            db.collection("investissements").doc(newInv.id).set(newInv).catch(err => console.error(err));
+                        }
+                        countInv++;
+                    }
+                }
+            });
+
+            if (dbMode === 'local') {
+                saveState();
+            }
+
+            refreshAllViews();
+
+            alert(`✅ Importation Excel terminée avec succès !\n\nRécapitulatif des données importées :\n• ${countTx} transactions comptables\n• ${countAdh} adhérents\n• ${countMan} manifestations\n• ${countInv} investissements`);
+        } catch(err) {
+            console.error("Erreur d'importation Excel:", err);
+            alert("Erreur lors de la lecture du fichier Excel : " + err.message);
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
