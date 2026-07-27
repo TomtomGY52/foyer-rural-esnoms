@@ -16,17 +16,17 @@
             errDiv.textContent += '\nError: ' + e.message + ' at ' + e.filename + ':' + e.lineno + ':' + e.colno;
         });
     </script>
-    <link rel="stylesheet" href="index.css?v=6.2">
+    <link rel="stylesheet" href="index.css?v=6.3">
     
     <!-- PWA Manifest & iOS Support -->
-    <link rel="manifest" href="manifest.json?v=6.2">
-    <link rel="apple-touch-icon" href="logo.png?v=6.2">
+    <link rel="manifest" href="manifest.json?v=6.3">
+    <link rel="apple-touch-icon" href="logo.png?v=6.3">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js?v=6.2')
+                navigator.serviceWorker.register('sw.js?v=6.3')
                     .then(reg => console.log('Service Worker registered successfully!', reg))
                     .catch(err => console.error('Service Worker registration failed:', err));
             });
@@ -39,7 +39,7 @@
     <!-- SheetJS CDN for Excel (.xlsx) Import/Export -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- Lucide Icons (Local Bundle) -->
-    <script src="lucide.min.js?v=6.2"></script>
+    <script src="lucide.min.js?v=6.3"></script>
     <!-- Firebase Compat SDKs (allows running from file:// without CORS module issues) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -52,7 +52,7 @@
     <div id="login-screen" style="display: none;">
         <div class="login-box">
             <div class="login-header">
-                <img src="logo.png?v=6.2" alt="Logo" class="login-logo" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px;" id="login-logo-img">
+                <img src="logo.png?v=6.3" alt="Logo" class="login-logo" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px;" id="login-logo-img">
                 <h2>Foyer Rural d'Esnoms au Val</h2>
                 <p>Espace d'Administration Sécurisé</p>
             </div>
@@ -82,7 +82,7 @@
                 <i data-lucide="menu" style="width: 20px; height: 20px;"></i>
             </button>
             <div style="display: flex; align-items: center; gap: 8px;">
-                <img id="mobile-header-logo" src="logo.png?v=6.2" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;" />
+                <img id="mobile-header-logo" src="logo.png?v=6.3" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;" />
                 <span style="font-weight: 700; font-size: 0.95rem; color: var(--text-main);">Foyer Rural</span>
             </div>
             <div style="width: 36px;"></div>
@@ -95,7 +95,7 @@
         <aside class="sidebar">
             <div class="logo-container" style="border-bottom: none; padding-bottom: 0; display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px;">
                 <div class="logo-details" style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
-                    <img id="sidebar-logo" src="logo.png?v=6.2" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
+                    <img id="sidebar-logo" src="logo.png?v=6.3" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
                     <span class="logo-title" style="white-space: nowrap;">Foyer Rural d'Esnoms au Val</span>
                 </div>
                 <!-- Sidebar Toggle Button (Inside Sidebar Logo Container) -->
@@ -1110,10 +1110,10 @@
                     <!-- Testing Tool: RAZ Data Button -->
                     <div style="margin-top: 20px; padding-top: 16px; border-top: 1px dashed var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                         <div style="font-size: 0.85rem; color: var(--danger); font-weight: 600; display: flex; align-items: center; gap: 6px;">
-                            <i data-lucide="flask-conical" style="width: 16px; height: 16px;"></i> 🧪 <strong>Outil de Test</strong> : Videz les données pour tester proprement vos fichiers d'importation Excel.
+                            <i data-lucide="flask-conical" style="width: 16px; height: 16px;"></i> 🧪 <strong>Outil de Test</strong> : Réinitialise uniquement la compta & manifestations (les paramètres et profils sont conservés).
                         </div>
-                        <button type="button" class="btn btn-danger" onclick="resetDatabaseForTesting()" style="font-size: 0.85rem; padding: 8px 16px; font-weight: 700;">
-                            <i data-lucide="trash-2"></i> ⚠️ RAZ Données (Remise à Zéro)
+                        <button type="button" class="btn btn-danger" onclick="resetDatabaseForTesting()" style="font-size: 0.85rem; padding: 8px 16px; font-weight: 700;" title="Efface uniquement la compta et les manifestations pour retester vos fichiers Excel (conserve vos paramètres)">
+                            <i data-lucide="trash-2"></i> ⚠️ RAZ Compta & Manifestations
                         </button>
                     </div>
                 </div>
@@ -2254,6 +2254,6 @@
     <!-- Expense Category Hover Popover -->
     <div id="expense-category-popover" class="category-popover"></div>
 
-    <script src="app.js?v=6.2"></script>
+    <script src="app.js?v=6.3"></script>
 </body>
 </html>

@@ -7609,12 +7609,15 @@ function parseAndImportExcelFile(file) {
 }
 
 function resetDatabaseForTesting() {
-    if (!confirm("⚠️ ATTENTION RÉINITIALISATION (RAZ) :\n\nVoulez-vous vraiment effacer TOUTES les données (transactions, adhérents, manifestations, investissements) ?\n\nCette action va réinitialiser vos données pour vous permettre de tester vos fichiers d'importation Excel à zéro.\n\nConfirmer la remise à zéro ?")) {
+    if (!confirm("⚠️ ATTENTION RÉINITIALISATION (RAZ) :\n\nVoulez-vous vraiment effacer uniquement les données de Comptabilité (transactions, investissements) et de Manifestations (événements, stands, recettes, dépenses) ?\n\nVos paramètres (profils, catégories, associations partenaires, équipements partagés, adhérents) seront STRICTEMENT CONSERVÉS.\n\nConfirmer la remise à zéro de la compta et des manifestations ?")) {
         return;
     }
 
     if (dbMode === 'firebase') {
-        const collections = ["transactions", "adherents", "manifestations", "investissements"];
+        const collections = [
+            "transactions", "investissements", "manifestations",
+            "feteRuraleStands", "feteRuraleReceipts", "feteRuraleExpenses", "feteRuralePartners"
+        ];
         collections.forEach(colName => {
             db.collection(colName).get().then(snapshot => {
                 snapshot.forEach(doc => doc.ref.delete());
@@ -7622,10 +7625,16 @@ function resetDatabaseForTesting() {
         });
     }
 
+    // Only clear Accounting & Manifestations data
     STATE.transactions = [];
-    STATE.adherents = [];
-    STATE.manifestations = [];
     STATE.investissements = [];
+    STATE.manifestations = [];
+    STATE.feteRuraleStands = [];
+    STATE.feteRuraleReceipts = [];
+    STATE.feteRuraleExpenses = [];
+    STATE.feteRuralePartners = [];
+
+    // All settings (STATE.categories, STATE.partnerAssociations, STATE.sharedEquipments, STATE.profiles, STATE.adherents, STATE.emitterInfo) remain preserved!
 
     if (dbMode === 'local') {
         saveState();
@@ -7633,6 +7642,6 @@ function resetDatabaseForTesting() {
 
     refreshAllViews();
 
-    alert("🧹 Remise à Zéro (RAZ) effectuée ! La base de données a été réinitialisée à zéro pour vos tests d'importation.");
+    alert("🧹 Remise à Zéro effectuée !\n\nLes données de comptabilité et de manifestations ont été effacées.\nTous vos paramètres, profils, catégories et équipements partagés ont été conservés intacts.");
 }
 
