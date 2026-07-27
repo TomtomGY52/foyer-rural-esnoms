@@ -7349,8 +7349,27 @@ function parseAndImportExcelFile(file) {
                         const dateStr = parseExcelDateValue(dateRaw);
                         const typeFlux = String(r[typeIdx] || "").trim().toLowerCase().includes("recette") ? "Recette" : "Dépense";
                         const catName = String(r[catIdx] || "").trim();
-                        const desc = String(descRaw || "").trim() || "Transaction importée Excel";
-                        const totalAmt = parseExcelNumValue(totalRaw);
+                        let qty = parseExcelNumValue(r[qtyIdx]);
+                        let priceUnit = parseExcelNumValue(r[priceIdx]);
+                        let totalAmt = parseExcelNumValue(totalRaw);
+
+                        // Automatic amount calculation: totalAmt = qty * priceUnit
+                        if (qty > 0 && priceUnit > 0) {
+                            totalAmt = Number((qty * priceUnit).toFixed(2));
+                        } else if (totalAmt > 0) {
+                            if (qty > 0 && (!priceUnit || priceUnit === 0)) {
+                                priceUnit = Number((totalAmt / qty).toFixed(2));
+                            } else if (priceUnit > 0 && (!qty || qty === 0)) {
+                                qty = Math.round(totalAmt / priceUnit) || 1;
+                            } else {
+                                qty = 1;
+                                priceUnit = totalAmt;
+                            }
+                        } else {
+                            qty = qty || 1;
+                            priceUnit = priceUnit || 0;
+                            totalAmt = Number((qty * priceUnit).toFixed(2));
+                        }
 
                         // Deduplication check: same date, same amount, same description
                         const isDuplicateTx = (STATE.transactions || []).some(t => {
@@ -7364,8 +7383,6 @@ function parseAndImportExcelFile(file) {
                             countSkippedTx++;
                             continue;
                         }
-                        const qty = parseExcelNumValue(r[qtyIdx]) || 1;
-                        const priceUnit = parseExcelNumValue(r[priceIdx]) || (qty > 0 ? totalAmt / qty : totalAmt);
                         const moyenPay = String(r[moyenIdx] || "Chèque").trim();
                         const statusStr = String(r[statusIdx] || "Payé").trim();
                         const numCheque = chequeNumIdx !== -1 ? String(r[chequeNumIdx] || "").trim() : "";
