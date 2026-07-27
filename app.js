@@ -7281,6 +7281,17 @@ function parseExcelNumValue(val) {
     return parseFloat(cleaned) || 0;
 }
 
+function findColIndex(headersRow, keywords, defaultIndex) {
+    if (!headersRow || !Array.isArray(headersRow)) return defaultIndex;
+    for (let i = 0; i < headersRow.length; i++) {
+        const h = String(headersRow[i] || "").toLowerCase().trim();
+        for (const kw of keywords) {
+            if (h.includes(kw)) return i;
+        }
+    }
+    return defaultIndex;
+}
+
 function parseAndImportExcelFile(file) {
     if (typeof XLSX === 'undefined') {
         alert("La bibliothèque Excel (SheetJS) n'est pas disponible.");
@@ -7295,67 +7306,104 @@ function parseAndImportExcelFile(file) {
 
             let countTx = 0, countAdh = 0, countMan = 0, countInv = 0;
 
-            workbook.SheetNames.forEach(sheetName => {
+            workbook.SheetNames.forEach((sheetName, sheetIndex) => {
                 const sheet = workbook.Sheets[sheetName];
                 const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
 
                 if (!rows || rows.length <= 1) return;
 
-                const nameLower = sheetName.toLowerCase();
+                const nameLower = String(sheetName || "").toLowerCase();
+                const headers = rows[0] || [];
+
+                // Helper to get category name safely
+                const getCatName = c => String(c ? (c.nom || c.libelle || "") : "").toLowerCase().trim();
 
                 // 1. Sheet: Transactions
-                if (nameLower.includes("transaction") || nameLower.includes("compta") || nameLower.includes("dépense") || nameLower.includes("recette")) {
+                if (nameLower.includes("transaction") || nameLower.includes("compta") || nameLower.includes("dépense") || nameLower.includes("recette") || sheetIndex === 0) {
+                    const dateIdx = findColIndex(headers, ["date"], 0);
+                    const typeIdx = findColIndex(headers, ["type", "flux"], 1);
+                    const catIdx = findColIndex(headers, ["catégorie", "categorie", "rubrique"], 2);
+                    const descIdx = findColIndex(headers, ["description", "libellé", "libelle", "objet", "intitulé"], 3);
+                    const totalIdx = findColIndex(headers, ["montant", "total", "somme"], 4);
+                    const qtyIdx = findColIndex(headers, ["quantité", "quantite", "qte"], 5);
+                    const priceIdx = findColIndex(headers, ["unitaire", "prix u"], 6);
+                    const moyenIdx = findColIndex(headers, ["moyen", "paiement", "règlement", "mode"], 7);
+                    const statusIdx = findColIndex(headers, ["statut", "état", "etat", "payé"], 8);
+                    const chequeNumIdx = findColIndex(headers, ["n°", "num", "numéro"], 9);
+                    const chequeEncIdx = findColIndex(headers, ["encaissé", "encaisse", "débité", "debit"], 10);
+                    const adhIdx = findColIndex(headers, ["adhérent", "adherant", "adherent", "membre", "client"], 11);
+                    const manIdx = findColIndex(headers, ["manifestation", "événement", "evenement", "fête"], 12);
+                    const eqIdx = findColIndex(headers, ["équipement", "equipement", "matériel"], 13);
+
                     for (let i = 1; i < rows.length; i++) {
                         const r = rows[i];
-                        if (!r || r.length === 0 || (!r[0] && !r[3] && !r[4])) continue;
+                        if (!r || r.length === 0) continue;
 
-                        const dateStr = parseExcelDateValue(r[0]);
-                        const typeFlux = String(r[1] || "").trim().toLowerCase().includes("recette") ? "Recette" : "Dépense";
-                        const catName = String(r[2] || "").trim();
-                        const desc = String(r[3] || "").trim() || "Transaction importée Excel";
-                        const totalAmt = parseExcelNumValue(r[4]);
-                        const qty = parseExcelNumValue(r[5]) || 1;
-                        const priceUnit = parseExcelNumValue(r[6]) || (qty > 0 ? totalAmt / qty : totalAmt);
-                        const moyenPay = String(r[7] || "Chèque").trim();
-                        const statusStr = String(r[8] || "Payé").trim();
-                        const numCheque = String(r[9] || "").trim();
-                        const chequeEnc = parseExcelBoolValue(r[10]);
-                        const adhRef = String(r[11] || "").trim();
-                        const manRef = String(r[12] || "").trim();
-                        const eqRef = String(r[13] || "").trim();
+                        const dateRaw = r[dateIdx];
+                        const descRaw = r[descIdx];
+                        const totalRaw = r[totalIdx];
 
-                        // Resolve or create Category
-                        let catObj = (STATE.categories || []).find(c => c.nom.toLowerCase() === catName.toLowerCase());
-                        if (!catObj && catName) {
-                            catObj = {
-                                id: "cat-" + Date.now() + Math.random().toString(36).substr(2, 4),
-                                nom: catName,
-                                type: typeFlux,
-                                code_comptable: "600"
-                            };
-                            STATE.categories.push(catObj);
-                            if (dbMode === 'firebase') {
-                                db.collection("categories").doc(catObj.id).set(catObj).catch(err => console.error(err));
+                        // Skip empty rows where date, desc and amount are all blank
+                        if (!dateRaw && !descRaw && (totalRaw === "" || totalRaw === undefined)) continue;
+
+                        const dateStr = parseExcelDateValue(dateRaw);
+                        const typeFlux = String(r[typeIdx] || "").trim().toLowerCase().includes("recette") ? "Recette" : "Dépense";
+                        const catName = String(r[catIdx] || "").trim();
+                        const desc = String(descRaw || "").trim() || "Transaction importée Excel";
+                        const totalAmt = parseExcelNumValue(totalRaw);
+                        const qty = parseExcelNumValue(r[qtyIdx]) || 1;
+                        const priceUnit = parseExcelNumValue(r[priceIdx]) || (qty > 0 ? totalAmt / qty : totalAmt);
+                        const moyenPay = String(r[moyenIdx] || "Chèque").trim();
+                        const statusStr = String(r[statusIdx] || "Payé").trim();
+                        const numCheque = chequeNumIdx !== -1 ? String(r[chequeNumIdx] || "").trim() : "";
+                        const chequeEnc = chequeEncIdx !== -1 ? parseExcelBoolValue(r[chequeEncIdx]) : false;
+                        const adhRef = adhIdx !== -1 ? String(r[adhIdx] || "").trim() : "";
+                        const manRef = manIdx !== -1 ? String(r[manIdx] || "").trim() : "";
+                        const eqRef = eqIdx !== -1 ? String(r[eqIdx] || "").trim() : "";
+
+                        // Safe Category resolution / creation
+                        let catObj = null;
+                        if (catName) {
+                            catObj = (STATE.categories || []).find(c => getCatName(c) === catName.toLowerCase());
+                            if (!catObj) {
+                                catObj = {
+                                    id: "cat-" + Date.now() + Math.random().toString(36).substr(2, 4),
+                                    nom: catName,
+                                    libelle: catName,
+                                    type: typeFlux,
+                                    code_comptable: "600"
+                                };
+                                STATE.categories.push(catObj);
+                                if (dbMode === 'firebase') {
+                                    db.collection("categories").doc(catObj.id).set(catObj).catch(err => console.error(err));
+                                }
                             }
                         }
                         const catId = catObj ? catObj.id : (typeFlux === "Recette" ? "cat-1" : "cat-5");
 
-                        // Resolve linked objects
+                        // Safe linked objects resolution
                         let adhId = "";
                         if (adhRef) {
-                            const foundAdh = (STATE.adherents || []).find(a => `${a.nom} ${a.prenom}`.toLowerCase().includes(adhRef.toLowerCase()) || `${a.prenom} ${a.nom}`.toLowerCase().includes(adhRef.toLowerCase()));
+                            const refLower = adhRef.toLowerCase();
+                            const foundAdh = (STATE.adherents || []).find(a => {
+                                const full1 = `${a.nom || ''} ${a.prenom || ''}`.toLowerCase();
+                                const full2 = `${a.prenom || ''} ${a.nom || ''}`.toLowerCase();
+                                return full1.includes(refLower) || full2.includes(refLower);
+                            });
                             if (foundAdh) adhId = foundAdh.id;
                         }
 
                         let manId = "";
                         if (manRef) {
-                            const foundMan = (STATE.manifestations || []).find(m => m.nom.toLowerCase().includes(manRef.toLowerCase()));
+                            const manLower = manRef.toLowerCase();
+                            const foundMan = (STATE.manifestations || []).find(m => (m.nom || "").toLowerCase().includes(manLower));
                             if (foundMan) manId = foundMan.id;
                         }
 
                         let eqId = "";
                         if (eqRef) {
-                            const foundEq = (STATE.sharedEquipments || []).find(e => e.nom.toLowerCase().includes(eqRef.toLowerCase()));
+                            const eqLower = eqRef.toLowerCase();
+                            const foundEq = (STATE.sharedEquipments || []).find(e => (e.nom || "").toLowerCase().includes(eqLower));
                             if (foundEq) eqId = foundEq.id;
                         }
 
@@ -7387,27 +7435,49 @@ function parseAndImportExcelFile(file) {
 
                 // 2. Sheet: Adhérents
                 else if (nameLower.includes("adhérent") || nameLower.includes("adherant") || nameLower.includes("adherent") || nameLower.includes("membre")) {
+                    const nomIdx = findColIndex(headers, ["nom"], 0);
+                    const prenomIdx = findColIndex(headers, ["prénom", "prenom"], 1);
+                    const emailIdx = findColIndex(headers, ["email", "courriel", "mail"], 2);
+                    const telIdx = findColIndex(headers, ["téléphone", "telephone", "tél", "tel"], 3);
+                    const adrIdx = findColIndex(headers, ["adresse"], 4);
+                    const dateAdhIdx = findColIndex(headers, ["adhésion", "adhesion", "date"], 5);
+                    const cotisIdx = findColIndex(headers, ["cotisation", "réglée", "reglee", "payé"], 6);
+                    const secIdx = findColIndex(headers, ["section", "groupe"], 7);
+
                     for (let i = 1; i < rows.length; i++) {
                         const r = rows[i];
-                        if (!r || (!r[0] && !r[1])) continue;
+                        if (!r || r.length === 0) continue;
 
-                        const nom = String(r[0] || "").trim();
-                        const prenom = String(r[1] || "").trim();
-                        const email = String(r[2] || "").trim();
-                        const tel = String(r[3] || "").trim();
-                        const adresse = String(r[4] || "").trim();
-                        const dateAdh = parseExcelDateValue(r[5]);
-                        const cotisReg = parseExcelBoolValue(r[6]);
-                        const section = String(r[7] || "Général").trim();
+                        const nom = String(r[nomIdx] || "").trim();
+                        const prenom = String(r[prenomIdx] || "").trim();
+                        const email = String(r[emailIdx] || "").trim();
+                        const tel = String(r[telIdx] || "").trim();
+                        const adresse = String(r[adrIdx] || "").trim();
+                        const dateAdh = parseExcelDateValue(r[dateAdhIdx]);
+                        const cotisReg = parseExcelBoolValue(r[cotisIdx]);
+                        const section = String(r[secIdx] || "Général").trim();
 
-                        const existing = (STATE.adherents || []).find(a => (a.nom.toLowerCase() === nom.toLowerCase() && a.prenom.toLowerCase() === prenom.toLowerCase()) || (email && a.email.toLowerCase() === email.toLowerCase()));
+                        const nomLower = nom.toLowerCase();
+                        const prenomLower = prenom.toLowerCase();
+                        const emailLower = email.toLowerCase();
+
+                        if (!nomLower && !prenomLower && !emailLower) continue;
+
+                        const existing = (STATE.adherents || []).find(a => {
+                            const aNom = (a.nom || "").toLowerCase();
+                            const aPrenom = (a.prenom || "").toLowerCase();
+                            const aEmail = (a.email || "").toLowerCase();
+                            if (nomLower && prenomLower && aNom === nomLower && aPrenom === prenomLower) return true;
+                            if (emailLower && aEmail === emailLower) return true;
+                            return false;
+                        });
 
                         if (existing) {
-                            existing.telephone = tel || existing.telephone;
-                            existing.adresse = adresse || existing.adresse;
-                            existing.date_adhesion = dateAdh || existing.date_adhesion;
+                            if (tel) existing.telephone = tel;
+                            if (adresse) existing.adresse = adresse;
+                            if (dateAdh) existing.date_adhesion = dateAdh;
                             existing.cotisation_reglee = cotisReg;
-                            existing.section = section;
+                            existing.section = section || existing.section;
                             if (dbMode === 'firebase') {
                                 db.collection("adherents").doc(existing.id).set(existing).catch(err => console.error(err));
                             }
@@ -7427,22 +7497,31 @@ function parseAndImportExcelFile(file) {
 
                 // 3. Sheet: Manifestations
                 else if (nameLower.includes("manifestation") || nameLower.includes("événement") || nameLower.includes("fête") || nameLower.includes("event")) {
+                    const nomIdx = findColIndex(headers, ["nom", "événement", "evenement", "manifestation"], 0);
+                    const debIdx = findColIndex(headers, ["début", "debut", "start"], 1);
+                    const finIdx = findColIndex(headers, ["fin", "end"], 2);
+                    const descIdx = findColIndex(headers, ["description", "détail", "detail"], 3);
+                    const statIdx = findColIndex(headers, ["statut", "état", "etat"], 4);
+
                     for (let i = 1; i < rows.length; i++) {
                         const r = rows[i];
-                        if (!r || !r[0]) continue;
+                        if (!r || r.length === 0) continue;
 
-                        const nom = String(r[0] || "").trim();
-                        const dateDeb = parseExcelDateValue(r[1]);
-                        const dateFin = parseExcelDateValue(r[2]);
-                        const desc = String(r[3] || "").trim();
-                        const statut = String(r[4] || "Terminée").trim();
+                        const nom = String(r[nomIdx] || "").trim();
+                        if (!nom) continue;
 
-                        const existing = (STATE.manifestations || []).find(m => m.nom.toLowerCase() === nom.toLowerCase());
+                        const dateDeb = parseExcelDateValue(r[debIdx]);
+                        const dateFin = parseExcelDateValue(r[finIdx]);
+                        const desc = String(r[descIdx] || "").trim();
+                        const statut = String(r[statIdx] || "Terminée").trim();
+
+                        const nomLower = nom.toLowerCase();
+                        const existing = (STATE.manifestations || []).find(m => (m.nom || "").toLowerCase() === nomLower);
                         if (existing) {
-                            existing.date_debut = dateDeb;
-                            existing.date_fin = dateFin;
-                            existing.description = desc;
-                            existing.statut = statut;
+                            existing.date_debut = dateDeb || existing.date_debut;
+                            existing.date_fin = dateFin || existing.date_fin;
+                            existing.description = desc || existing.description;
+                            existing.statut = statut || existing.statut;
                             if (dbMode === 'firebase') {
                                 db.collection("manifestations").doc(existing.id).set(existing).catch(err => console.error(err));
                             }
@@ -7462,18 +7541,29 @@ function parseAndImportExcelFile(file) {
 
                 // 4. Sheet: Investissements
                 else if (nameLower.includes("invest") || nameLower.includes("matériel") || nameLower.includes("équipement")) {
+                    const libIdx = findColIndex(headers, ["libellé", "libelle", "matériel", "materiel", "nom"], 0);
+                    const dateIdx = findColIndex(headers, ["acquisition", "date", "achat"], 1);
+                    const montIdx = findColIndex(headers, ["montant", "prix", "coût", "cout"], 2);
+                    const durIdx = findColIndex(headers, ["durée", "duree", "amortissement", "ans"], 3);
+                    const etatIdx = findColIndex(headers, ["état", "etat"], 4);
+                    const moyenIdx = findColIndex(headers, ["moyen", "paiement", "mode"], 5);
+                    const numIdx = findColIndex(headers, ["n°", "num", "numéro"], 6);
+                    const encIdx = findColIndex(headers, ["encaissé", "encaisse", "débité"], 7);
+
                     for (let i = 1; i < rows.length; i++) {
                         const r = rows[i];
-                        if (!r || !r[0]) continue;
+                        if (!r || r.length === 0) continue;
 
-                        const libelle = String(r[0] || "").trim();
-                        const dateAcq = parseExcelDateValue(r[1]);
-                        const montant = parseExcelNumValue(r[2]);
-                        const duree = parseExcelNumValue(r[3]) || 0;
-                        const etat = String(r[4] || "Neuf").trim();
-                        const moyen = String(r[5] || "Virement").trim();
-                        const numCheque = String(r[6] || "").trim();
-                        const chequeEnc = parseExcelBoolValue(r[7]);
+                        const libelle = String(r[libIdx] || "").trim();
+                        if (!libelle) continue;
+
+                        const dateAcq = parseExcelDateValue(r[dateIdx]);
+                        const montant = parseExcelNumValue(r[montIdx]);
+                        const duree = parseExcelNumValue(r[durIdx]) || 0;
+                        const etat = String(r[etatIdx] || "Neuf").trim();
+                        const moyen = String(r[moyenIdx] || "Virement").trim();
+                        const numCheque = numIdx !== -1 ? String(r[numIdx] || "").trim() : "";
+                        const chequeEnc = encIdx !== -1 ? parseExcelBoolValue(r[encIdx]) : false;
 
                         const newInv = {
                             id: "inv-" + Date.now() + Math.random().toString(36).substr(2, 4),
