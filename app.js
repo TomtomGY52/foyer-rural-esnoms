@@ -3398,8 +3398,9 @@ function buildAndShowInvoice(customer, tx) {
                     <div style="margin-bottom: 4px;">
                         <input type="text" id="invoice-edit-customer-email" value="${customer.email || ''}" placeholder="Adresse e-mail" style="border: 1px dashed #cbd5e1; background: transparent; padding: 2px 4px; font-family: inherit; font-size: 0.83rem; width: 230px;" />
                     </div>
-                    <div style="font-size: 0.82rem; color: #64748b;">
-                        Date d'adhésion / Enregistrement : ${customer.date_adhesion ? formatDateFrench(new Date(customer.date_adhesion)) : '--'}
+                    <div style="font-size: 0.82rem; color: #475569; display: flex; align-items: center; gap: 4px; margin-top: 4px;">
+                        <strong style="white-space: nowrap; color: #64748b;">Date d'adhésion :</strong>
+                        <input type="text" id="invoice-edit-customer-date-adhesion" value="${customer.date_adhesion ? (customer.date_adhesion.includes('-') ? formatDateFrench(new Date(customer.date_adhesion)) : customer.date_adhesion) : ''}" placeholder="JJ/MM/AAAA ou YYYY-MM-DD" style="border: 1px dashed #cbd5e1; background: transparent; padding: 2px 4px; font-family: inherit; font-size: 0.82rem; width: 140px; color: #0f172a; font-weight: 600;" />
                     </div>
                 </div>
             </div>
@@ -3530,6 +3531,12 @@ function saveInvoiceEdits() {
         }
     }
     
+    const dateAdhInput = document.getElementById("invoice-edit-customer-date-adhesion");
+    const dateAdh = dateAdhInput ? dateAdhInput.value.trim() : "";
+    if (currentInvoiceCustomer) {
+        currentInvoiceCustomer.date_adhesion = dateAdh;
+    }
+
     // 1. Update customer if linked to adherent
     if (currentInvoiceTx.adherent_id) {
         const a = STATE.adherents.find(item => item.id === currentInvoiceTx.adherent_id);
@@ -3537,6 +3544,7 @@ function saveInvoiceEdits() {
             a.prenom = prenom;
             a.nom = nom;
             a.email = email;
+            if (dateAdh) a.date_adhesion = dateAdh;
             
             if (dbMode === 'firebase') {
                 db.collection("adherents").doc(a.id).set(a).catch(err => console.error(err));
@@ -3579,6 +3587,89 @@ function saveInvoiceEdits() {
     closeModal("modal-invoice");
     refreshAllViews();
     alert("Facture et transaction associées enregistrées avec succès !");
+}
+
+function generatePDFFromElement(elementId, filename, callback) {
+    const el = document.getElementById(elementId);
+    if (!el) {
+        if (callback) callback(false);
+        return;
+    }
+
+    if (typeof html2pdf !== 'undefined') {
+        const opt = {
+            margin:       [8, 8, 8, 8],
+            filename:     filename,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true, logging: false },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        html2pdf().set(opt).from(el).save().then(() => {
+            if (callback) callback(true);
+        }).catch(err => {
+            console.error("html2pdf error:", err);
+            window.print();
+            if (callback) callback(false);
+        });
+    } else {
+        window.print();
+        if (callback) callback(false);
+    }
+}
+
+function sendInvoiceByEmail() {
+    const prenomInput = document.getElementById("invoice-edit-customer-prenom");
+    const nomInput = document.getElementById("invoice-edit-customer-nom");
+    const emailInput = document.getElementById("invoice-edit-customer-email");
+    const numInput = document.getElementById("invoice-edit-num");
+    const yearInput = document.getElementById("invoice-edit-year");
+    
+    const prenom = prenomInput ? prenomInput.value.trim() : (currentInvoiceCustomer ? currentInvoiceCustomer.prenom || '' : '');
+    const nom = nomInput ? nomInput.value.trim() : (currentInvoiceCustomer ? currentInvoiceCustomer.nom || '' : '');
+    const email = emailInput ? emailInput.value.trim() : (currentInvoiceCustomer ? currentInvoiceCustomer.email || '' : '');
+    const invNum = numInput ? numInput.value.trim() : "FAC-COMMERCIAL";
+    const year = yearInput ? yearInput.value.trim() : new Date().getFullYear();
+    const fullName = `${prenom} ${nom}`.trim() || "Client";
+    
+    const filename = `Facture_${invNum}.pdf`;
+
+    generatePDFFromElement("invoice-modal-content", filename, () => {
+        const subject = encodeURIComponent(`Facture N° ${invNum} (Exercice ${year}) - Foyer Rural d'Esnoms au Val`);
+        const bodyText = `Bonjour ${fullName},\n\nVeuillez trouver ci-joint votre facture N° ${invNum} concernant le Foyer Rural d'Esnoms au Val.\n\nNOTE IMPORTANTE : Le fichier PDF "${filename}" vient d'être téléchargé sur votre appareil. Pensez à l'attacher à cet e-mail avant d'envoyer.\n\nCordialement,\nLe Foyer Rural d'Esnoms au Val`;
+        const body = encodeURIComponent(bodyText);
+        
+        const mailtoUrl = `mailto:${encodeURIComponent(email)}?subject=${subject}&body=${body}`;
+        
+        window.location.href = mailtoUrl;
+
+        alert(`Le fichier PDF '${filename}' a été généré et téléchargé.\n\nVotre messagerie par défaut s'ouvre avec l'adresse (${email || 'à compléter'}) et le sujet préremplis.\n\nN'oubliez pas de joindre le fichier PDF téléchargé à votre e-mail !`);
+    });
+}
+
+function sendPartnerInvoiceByEmail() {
+    const assocNomInput = document.getElementById("partner-inv-edit-assoc-nom");
+    const assocEmailInput = document.getElementById("partner-inv-edit-assoc-email");
+    const refInput = document.getElementById("partner-inv-edit-ref");
+    const doctypeInput = document.getElementById("partner-inv-edit-doctype");
+
+    const assocNom = assocNomInput ? assocNomInput.value.trim() : "Association Partenaire";
+    const assocEmail = assocEmailInput ? assocEmailInput.value.trim() : "";
+    const ref = refInput ? refInput.value.trim() : "FAC-INTER";
+    const doctype = doctypeInput ? doctypeInput.value.trim() : "DÉCOMPTE OFFICIEL INTER-ASSOCIATIONS";
+
+    const filename = `Decompte_Inter_Association_${ref}.pdf`;
+
+    generatePDFFromElement("partner-invoice-printable-content", filename, () => {
+        const subject = encodeURIComponent(`${doctype} (${ref}) - Foyer Rural d'Esnoms au Val`);
+        const bodyText = `Bonjour,\n\nVeuillez trouver ci-joint le décompte officiel / attestation inter-association (${ref}) concernant l'association ${assocNom}.\n\nNOTE IMPORTANTE : Le fichier PDF "${filename}" vient d'être téléchargé sur votre appareil. Pensez à l'attacher à cet e-mail avant d'envoyer.\n\nCordialement,\nLe Foyer Rural d'Esnoms au Val`;
+        const body = encodeURIComponent(bodyText);
+
+        const mailtoUrl = `mailto:${encodeURIComponent(assocEmail)}?subject=${subject}&body=${body}`;
+
+        window.location.href = mailtoUrl;
+
+        alert(`Le fichier PDF '${filename}' a été généré et téléchargé.\n\nVotre messagerie par défaut s'ouvre avec l'adresse destinataire (${assocEmail || 'à compléter'}) et le sujet préremplis.\n\nN'oubliez pas de joindre le fichier PDF téléchargé à votre e-mail !`);
+    });
 }
 
 // Simple hash generator for invoice auto-numbering
