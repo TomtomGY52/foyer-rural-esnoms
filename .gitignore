@@ -1,6 +1,6 @@
 # Antigravity & Agent environment directories
 .gemini/
-.agents/
+!.agents/AGENTS.md
 
 # Dependency directories
 node_modules/

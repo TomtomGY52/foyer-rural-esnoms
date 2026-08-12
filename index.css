@@ -472,30 +472,34 @@ body {
     .sidebar {
         position: fixed;
         top: 60px;
-        left: -280px;
+        left: 0;
+        transform: translateX(-100%);
         width: 280px;
+        height: calc(100dvh - 60px);
         height: calc(100vh - 60px);
         background: var(--bg-surface);
         z-index: 1000;
-        transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        box-shadow: 4px 0 12px rgba(0, 0, 0, 0.05);
+        transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        will-change: transform;
+        box-shadow: 4px 0 12px rgba(0, 0, 0, 0.08);
         border-right: 1px solid var(--border-color);
         padding: 20px;
         overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
     .sidebar.open {
-        left: 0;
+        transform: translateX(0);
     }
     #sidebar-backdrop {
         position: fixed;
         top: 60px;
         left: 0;
         width: 100vw;
+        height: calc(100dvh - 60px);
         height: calc(100vh - 60px);
-        background: rgba(15, 23, 42, 0.3);
-        backdrop-filter: blur(2px);
+        background: rgba(15, 23, 42, 0.4);
         z-index: 999;
-        animation: fadeIn 0.2s ease-out;
+        animation: fadeIn 0.15s ease-out;
     }
     .main-content {
         padding: 16px;
@@ -1448,12 +1452,16 @@ tr:hover td {
     .sidebar {
         position: fixed !important;
         top: 60px !important;
-        left: -280px !important;
+        left: 0 !important;
+        transform: translateX(-100%) !important;
         width: 280px !important;
+        height: calc(100dvh - 60px) !important;
         height: calc(100vh - 60px) !important;
         background-color: var(--bg-surface) !important;
         z-index: 1000 !important;
-        box-shadow: 4px 0 12px rgba(0, 0, 0, 0.05) !important;
+        transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        will-change: transform !important;
+        box-shadow: 4px 0 12px rgba(0, 0, 0, 0.08) !important;
         border-radius: 0 !important;
         border-right: 1px solid var(--border-color) !important;
         border-left: none !important;
@@ -1464,10 +1472,11 @@ tr:hover td {
         display: flex !important;
         flex-direction: column !important;
         overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
     }
     
     .sidebar.open {
-        left: 0 !important;
+        transform: translateX(0) !important;
     }
 
     /* Tennis week navigation overlap fix */
