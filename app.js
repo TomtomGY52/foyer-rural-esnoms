@@ -265,11 +265,20 @@ function connectLocal() {
             saveState();
         }
         
+        if ((!STATE.transactions || STATE.transactions.length === 0) && typeof injectWorkbookData === 'function') {
+            console.log("Local database empty, auto-injecting historic FR (1) data...");
+            injectWorkbookData(true);
+        }
+        
         refreshAllViews();
     } else {
-        // Seed with demo data
-        console.log("No data found. Seeding database with demo data...");
-        seedDemoData();
+        // Seed with demo data or historic data
+        console.log("No data found. Seeding database with historic FR (1) data...");
+        if (typeof injectWorkbookData === 'function') {
+            injectWorkbookData(true);
+        } else {
+            seedDemoData();
+        }
     }
 }
 
@@ -378,6 +387,12 @@ function connectFirebase() {
                                 DEFAULT_CATEGORIES.forEach(dc => {
                                     db.collection("categories").doc(dc.id).set(dc).catch(() => {});
                                 });
+                            }
+                        }
+                        if (col === 'transactions') {
+                            if (items.length === 0 && typeof injectWorkbookData === 'function') {
+                                console.log("Database empty, auto-injecting historic FR (1) data...");
+                                setTimeout(() => injectWorkbookData(true), 500);
                             }
                         }
                         STATE[col] = items;
@@ -7667,9 +7682,11 @@ const HISTORIC_WORKBOOK_DATA = {"transactions": [{"id": "tx-imp-1", "date_transa
 
 
 
-function injectWorkbookData() {
-    if (!confirm(`🚀 IMPORTER LES DONNÉES HISTORIQUES DU FICHIER FR (1) ?\n\nCette action va injecter :\n• 373 transactions comptables (2019 à 2026)\n• 54 adhérents\n• 9 manifestations\n• 26 catégories\n\nConfirmer l'importation de toutes les données du fichier FR (1) ?`)) {
-        return;
+function injectWorkbookData(silent = false) {
+    if (!silent) {
+        if (!confirm(`🚀 IMPORTER LES DONNÉES HISTORIQUES DU FICHIER FR (1) ?\n\nCette action va injecter :\n• 373 transactions comptables (2019 à 2026)\n• 54 adhérents\n• 9 manifestations\n• 26 catégories\n\nConfirmer l'importation de toutes les données du fichier FR (1) ?`)) {
+            return;
+        }
     }
 
     const data = HISTORIC_WORKBOOK_DATA;
@@ -7753,9 +7770,9 @@ function injectWorkbookData() {
         countTx++;
     });
 
-    if (dbMode === 'local') {
-        saveState();
-    }
+    refreshAllViews();
 
-    alert(`🎉 Importation des 373 données du fichier FR (1) réussie !\n\n• ${countTx} nouvelles transactions comptables (2019 à 2026)\n• ${countAdh} adhérents\n• ${countMan} manifestations\n• ${countSkippedTx} doublons ignorés`);
+    if (!silent) {
+        alert(`🎉 Importation des 373 données du fichier FR (1) réussie !\n\n• ${countTx} nouvelles transactions comptables (2019 à 2026)\n• ${countAdh} adhérents\n• ${countMan} manifestations\n• ${countSkippedTx} doublons ignorés`);
+    }
 }
