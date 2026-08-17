@@ -941,8 +941,8 @@ function renderDashboardAlerts(lowStocks, activeMembers) {
         `;
     }
 
-    // Unpaid transactions alerts
-    const unpaidTransactionsCount = STATE.transactions.filter(t => !t.paye).length;
+    // Unpaid transactions alerts in active period
+    const unpaidTransactionsCount = STATE.transactions.filter(t => !t.paye && isDateInPeriod(t.date_transaction, STATE.currentPeriod)).length;
     if (unpaidTransactionsCount > 0) {
         alertsList.innerHTML += `
             <div style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: var(--border-radius); padding: 14px; display: flex; align-items: center; justify-content: space-between;">
@@ -5591,6 +5591,19 @@ function updatePeriodDisplay() {
     }
 }
 
+function getDefaultDateForCurrentPeriod() {
+    const todayStr = formatDate(new Date());
+    if (isDateInPeriod(todayStr, STATE.currentPeriod)) {
+        return todayStr;
+    }
+    const parts = (STATE.currentPeriod || "").split('-');
+    if (parts.length === 2) {
+        const startYear = parseInt(parts[0]);
+        return `${startYear}-10-15`;
+    }
+    return todayStr;
+}
+
 function isDateInPeriod(dateStr, period) {
     if (!dateStr) return false;
     const d = new Date(dateStr);
@@ -7127,7 +7140,7 @@ function exportFullDatabaseToExcel() {
         "Statut (Payé/En attente)", "N° de Chèque", "Chèque Encaissé (Oui/Non)",
         "Adhérent (Nom Prénom)", "Manifestation", "Équipement"
     ];
-    const txRows = (STATE.transactions || []).map(t => {
+    const txRows = (STATE.transactions || []).filter(t => isDateInPeriod(t.date_transaction, STATE.currentPeriod)).map(t => {
         const cat = (STATE.categories || []).find(c => c.id === t.categorie_id);
         const adh = (STATE.adherents || []).find(a => a.id === t.adherent_id);
         const man = (STATE.manifestations || []).find(m => m.id === t.manifestation_id);
