@@ -182,6 +182,63 @@ function initApp() {
     
     // Initialize icons
     safeCreateIcons();
+
+    // Safety fallback: ensure loading screen disappears after max 2.2s
+    setTimeout(() => {
+        hideAppLoadingScreen();
+    }, 2200);
+}
+
+// --- App Loading Progress Helpers ---
+let loadedCollectionsMap = {};
+let appLoadingFinished = false;
+
+function updateAppLoadingProgress(colName) {
+    if (appLoadingFinished) return;
+
+    if (colName) {
+        loadedCollectionsMap[colName] = true;
+    }
+
+    const totalCols = 16;
+    const loadedCount = Object.keys(loadedCollectionsMap).length;
+    const percent = Math.min(100, Math.max(15, Math.round((loadedCount / totalCols) * 100)));
+
+    const progressBar = document.getElementById("loading-progress-bar");
+    const percentText = document.getElementById("loading-percent-text");
+    const statusText = document.getElementById("loading-status-text");
+
+    if (progressBar) progressBar.style.width = percent + "%";
+    if (percentText) percentText.innerText = percent + "%";
+    if (statusText && percent > 15) {
+        statusText.innerText = `Synchronisation des données (${loadedCount}/${totalCols})...`;
+    }
+
+    if (loadedCount >= totalCols) {
+        hideAppLoadingScreen();
+    }
+}
+
+function hideAppLoadingScreen() {
+    if (appLoadingFinished) return;
+    appLoadingFinished = true;
+
+    const progressBar = document.getElementById("loading-progress-bar");
+    const percentText = document.getElementById("loading-percent-text");
+    const statusText = document.getElementById("loading-status-text");
+
+    if (progressBar) progressBar.style.width = "100%";
+    if (percentText) percentText.innerText = "100%";
+    if (statusText) statusText.innerText = "Données synchronisées !";
+
+    setTimeout(() => {
+        const screen = document.getElementById("app-loading-screen");
+        if (screen) {
+            screen.style.opacity = "0";
+            screen.style.visibility = "hidden";
+            screen.style.pointerEvents = "none";
+        }
+    }, 350);
 }
 
 // --- Local Storage Database Mode ---
@@ -266,10 +323,12 @@ function connectLocal() {
         }
         
         refreshAllViews();
+        setTimeout(hideAppLoadingScreen, 300);
     } else {
         // Seed with demo data
         console.log("No data found. Seeding database with demo data...");
         seedDemoData();
+        setTimeout(hideAppLoadingScreen, 300);
     }
 }
 
@@ -384,15 +443,18 @@ function connectFirebase() {
                         if (col === 'profiles') {
                             STATE.profilesLoaded = true;
                         }
+                        updateAppLoadingProgress(col);
                         refreshAllViews();
                     }, error => {
                         console.error(`Firebase listen error on ${col}:`, error);
+                        updateAppLoadingProgress(col);
                     });
                     activeFirebaseListeners.push(unsub);
                 });
                 
             } else {
                 // User is signed out: display login, hide main app
+                hideAppLoadingScreen();
                 document.getElementById("login-screen").style.display = "flex";
                 const logoutBtn = document.getElementById("btn-sidebar-logout");
                 if (logoutBtn) logoutBtn.style.display = "none";
