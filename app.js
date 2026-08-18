@@ -1527,12 +1527,11 @@ function renderGeneralExpensesList() {
 
     const filtered = STATE.transactions.filter(t => {
         const matchesType = t.type_flux === "Dépense";
-        const matchesGeneral = !t.manifestation_id;
         const matchesPeriod = isDateInPeriod(t.date_transaction, STATE.currentPeriod);
         const matchesSearch = t.description.toLowerCase().includes(searchVal);
         const matchesCat = filterCat === "all" || t.categorie_id === filterCat;
         
-        return matchesType && matchesGeneral && matchesPeriod && matchesSearch && matchesCat;
+        return matchesType && matchesPeriod && matchesSearch && matchesCat;
     });
 
     // Sort
@@ -1569,6 +1568,13 @@ function renderGeneralExpensesList() {
         const payeBadgeClass = t.paye ? "badge-success" : "badge-warning";
         const payeLabel = t.paye ? "Réglé" : "En attente";
 
+        let manifBadge = "";
+        if (t.manifestation_id) {
+            const m = (STATE.manifestations || []).find(man => man.id === t.manifestation_id);
+            const mName = m ? m.nom : "Manifestation";
+            manifBadge = `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); margin-left: 6px; font-size: 0.75rem; font-weight: 600;">🎪 ${mName}</span>`;
+        }
+
         let eqBadge = "";
         if (t.equipement_id) {
             const eq = (STATE.sharedEquipments || []).find(e => e.id === t.equipement_id);
@@ -1594,7 +1600,7 @@ function renderGeneralExpensesList() {
             <tr>
                 <td>${dateStr}</td>
                 <td>${catLabel}</td>
-                <td style="font-weight: 500;">${t.description}${eqBadge}${chequeBadge}</td>
+                <td style="font-weight: 500;">${t.description}${manifBadge}${eqBadge}${chequeBadge}</td>
                 <td style="font-weight: 600; text-align: right; color: var(--danger);">${Number(t.montant).toFixed(2)} €</td>
                 <td>
                     <span class="badge ${payeBadgeClass}" style="cursor: pointer;" onclick="toggleTransactionPaid('${t.id}')" title="Changer statut de paiement">
@@ -1635,12 +1641,11 @@ function renderGeneralReceiptsList() {
 
     const filtered = STATE.transactions.filter(t => {
         const matchesType = t.type_flux === "Recette";
-        const matchesGeneral = !t.manifestation_id;
         const matchesPeriod = isDateInPeriod(t.date_transaction, STATE.currentPeriod);
         const matchesSearch = t.description.toLowerCase().includes(searchVal);
         const matchesCat = filterCat === "all" || t.categorie_id === filterCat;
         
-        return matchesType && matchesGeneral && matchesPeriod && matchesSearch && matchesCat;
+        return matchesType && matchesPeriod && matchesSearch && matchesCat;
     });
 
     // Sort
@@ -1682,6 +1687,13 @@ function renderGeneralReceiptsList() {
         const payeBadgeClass = t.paye ? "badge-success" : "badge-warning";
         const payeLabel = t.paye ? "Réglé" : "En attente";
         
+        let manifBadge = "";
+        if (t.manifestation_id) {
+            const m = (STATE.manifestations || []).find(man => man.id === t.manifestation_id);
+            const mName = m ? m.nom : "Manifestation";
+            manifBadge = `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); margin-left: 6px; font-size: 0.75rem; font-weight: 600;">🎪 ${mName}</span>`;
+        }
+
         let eqBadge = "";
         if (t.equipement_id) {
             const eq = (STATE.sharedEquipments || []).find(e => e.id === t.equipement_id);
@@ -1707,7 +1719,7 @@ function renderGeneralReceiptsList() {
             <tr>
                 <td>${dateStr}</td>
                 <td>${catLabel}</td>
-                <td style="font-weight: 500;">${t.description}${eqBadge}${chequeBadge}</td>
+                <td style="font-weight: 500;">${t.description}${manifBadge}${eqBadge}${chequeBadge}</td>
                 <td style="font-weight: 600; text-align: right; color: var(--secondary);">${Number(t.montant).toFixed(2)} €</td>
                 <td>
                     <span class="badge ${payeBadgeClass}" style="cursor: pointer;" onclick="toggleTransactionPaid('${t.id}')" title="Changer statut de paiement">
@@ -7638,24 +7650,19 @@ function parseAndImportExcelFile(file) {
     reader.readAsArrayBuffer(file);
 }
 
-function resetDatabaseForTesting() {
-    if (!confirm("⚠️ ATTENTION RÉINITIALISATION (RAZ) :\n\nVoulez-vous vraiment effacer uniquement les données de Comptabilité (transactions, investissements) et de Manifestations (événements, stands, recettes, dépenses) ?\n\nVos paramètres (profils, catégories, associations partenaires, équipements partagés, adhérents) seront STRICTEMENT CONSERVÉS.\n\nConfirmer la remise à zéro de la compta et des manifestations ?")) {
-        return;
-    }
+async function resetDatabaseForTesting(mode = 'compta') {
+    const isTotal = mode === 'total';
+    const confirmMessage = isTotal ?
+        "🔥 ATTENTION RÉINITIALISATION TOTALE (RAZ TOTALE) :\n\nVoulez-vous vraiment effacer TOUTES les données de la base ?\n• Transactions comptables\n• Manifestations & Stands\n• Adhérents & Cotisations\n• Investissements & Notes\n\nVos paramètres (catégories, profils, équipements partagés) seront conservés.\n\nConfirmer l'effacement TOTAL ?" :
+        "⚠️ ATTENTION RÉINITIALISATION (RAZ COMPTA) :\n\nVoulez-vous effacer uniquement les données de Comptabilité (transactions, investissements) et de Manifestations ?\n\nVos adhérents, catégories et paramètres seront STRICTEMENT CONSERVÉS.\n\nConfirmer l'effacement ?";
 
-    if (dbMode === 'firebase') {
-        const collections = [
-            "transactions", "investissements", "manifestations",
-            "feteRuraleStands", "feteRuraleReceipts", "feteRuraleExpenses", "feteRuralePartners"
-        ];
-        collections.forEach(colName => {
-            db.collection(colName).get().then(snapshot => {
-                snapshot.forEach(doc => doc.ref.delete());
-            }).catch(err => console.error("Erreur effacement " + colName, err));
-        });
-    }
+    if (!confirm(confirmMessage)) return;
 
-    // Only clear Accounting & Manifestations data
+    const collectionsToClear = isTotal ?
+        ["transactions", "investissements", "manifestations", "feteRuraleStands", "feteRuraleReceipts", "feteRuraleExpenses", "feteRuralePartners", "adherents", "notes", "reservations"] :
+        ["transactions", "investissements", "manifestations", "feteRuraleStands", "feteRuraleReceipts", "feteRuraleExpenses", "feteRuralePartners"];
+
+    // 1. Clear Local State in Memory immediately
     STATE.transactions = [];
     STATE.investissements = [];
     STATE.manifestations = [];
@@ -7663,14 +7670,48 @@ function resetDatabaseForTesting() {
     STATE.feteRuraleReceipts = [];
     STATE.feteRuraleExpenses = [];
     STATE.feteRuralePartners = [];
-
-    // All settings (STATE.categories, STATE.partnerAssociations, STATE.sharedEquipments, STATE.profiles, STATE.adherents, STATE.emitterInfo) remain preserved!
-
-    if (dbMode === 'local') {
-        saveState();
+    if (isTotal) {
+        STATE.adherents = [];
+        STATE.notes = [];
+        STATE.reservations = [];
     }
 
+    // Always update LocalStorage cache
+    saveState();
+
+    // 2. Perform robust batch deletes in Firebase if active
+    if (STATE.firebaseEnabled && window.db) {
+        try {
+            for (const colName of collectionsToClear) {
+                const snapshot = await db.collection(colName).get();
+                if (!snapshot.empty) {
+                    const batchSize = 400;
+                    let batch = db.batch();
+                    let count = 0;
+                    for (const doc of snapshot.docs) {
+                        batch.delete(doc.ref);
+                        count++;
+                        if (count % batchSize === 0) {
+                            await batch.commit();
+                            batch = db.batch();
+                        }
+                    }
+                    if (count % batchSize !== 0) {
+                        await batch.commit();
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("Erreur lors de la suppression Firebase:", err);
+        }
+    }
+
+    // 3. Refresh UI views
     refreshAllViews();
 
-    alert("🧹 Remise à Zéro effectuée !\n\nLes données de comptabilité et de manifestations ont été effacées.\nTous vos paramètres, profils, catégories et équipements partagés ont été conservés intacts.");
+    const successMessage = isTotal ?
+        "🔥 Remise à Zéro TOTALE effectuée !\n\nToutes les transactions, manifestations, adhérents et notes ont été effacés de la base.\nVos paramètres et catégories restent conservés." :
+        "🧹 Remise à Zéro de la Compta effectuée !\n\nLes données de comptabilité et de manifestations ont été effacées.\nTous vos adhérents, profils et paramètres ont été conservés intacts.";
+
+    alert(successMessage);
 }

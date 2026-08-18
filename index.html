@@ -16,19 +16,19 @@
             errDiv.textContent += '\nError: ' + e.message + ' at ' + e.filename + ':' + e.lineno + ':' + e.colno;
         });
     </script>
-    <link rel="stylesheet" href="index.css?v=7.6">
+    <link rel="stylesheet" href="index.css?v=7.7">
     
     <!-- Favicon & PWA Icons -->
-    <link rel="icon" type="image/png" href="logo.png?v=7.6">
-    <link rel="shortcut icon" type="image/png" href="logo.png?v=7.6">
-    <link rel="manifest" href="manifest.json?v=7.6">
-    <link rel="apple-touch-icon" href="logo.png?v=7.6">
+    <link rel="icon" type="image/png" href="logo.png?v=7.7">
+    <link rel="shortcut icon" type="image/png" href="logo.png?v=7.7">
+    <link rel="manifest" href="manifest.json?v=7.7">
+    <link rel="apple-touch-icon" href="logo.png?v=7.7">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js?v=7.6')
+                navigator.serviceWorker.register('sw.js?v=7.7')
                     .then(reg => {
                         console.log('Service Worker registered successfully!', reg);
                         reg.update(); // Force immediate update check on load
@@ -52,7 +52,7 @@
     <!-- SheetJS CDN for Excel (.xlsx) Import/Export -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- Lucide Icons (Local Bundle) -->
-    <script src="lucide.min.js?v=7.6"></script>
+    <script src="lucide.min.js?v=7.7"></script>
     <!-- Firebase Compat SDKs (allows running from file:// without CORS module issues) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -65,7 +65,7 @@
     <div id="login-screen" style="display: none;">
         <div class="login-box">
             <div class="login-header">
-                <img src="logo.png?v=7.6" alt="Logo" class="login-logo" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px;" id="login-logo-img">
+                <img src="logo.png?v=7.7" alt="Logo" class="login-logo" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px;" id="login-logo-img">
                 <h2>Foyer Rural d'Esnoms au Val</h2>
                 <p>Espace d'Administration Sécurisé</p>
             </div>
@@ -95,7 +95,7 @@
                 <i data-lucide="menu" style="width: 20px; height: 20px;"></i>
             </button>
             <div style="display: flex; align-items: center; gap: 8px;">
-                <img id="mobile-header-logo" src="logo.png?v=7.6" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;" />
+                <img id="mobile-header-logo" src="logo.png?v=7.7" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;" />
                 <span style="font-weight: 700; font-size: 0.95rem; color: var(--text-main);">Foyer Rural</span>
             </div>
             <div style="width: 36px;"></div>
@@ -108,7 +108,7 @@
         <aside class="sidebar">
             <div class="logo-container" style="border-bottom: none; padding-bottom: 0; display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px;">
                 <div class="logo-details" style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
-                    <img id="sidebar-logo" src="logo.png?v=7.6" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
+                    <img id="sidebar-logo" src="logo.png?v=7.7" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
                     <span class="logo-title" style="white-space: nowrap;">Foyer Rural d'Esnoms au Val</span>
                 </div>
                 <!-- Sidebar Toggle Button (Inside Sidebar Logo Container) -->
@@ -1003,13 +1003,13 @@
                     <!-- Version & Release Info Panel -->
                     <div class="glass-panel" style="grid-column: 1 / -1; display: flex; gap: 24px; align-items: flex-start; padding: 24px;">
                         <div style="background: rgba(99, 102, 241, 0.1); color: var(--primary); padding: 8px 14px; border-radius: 8px; font-weight: 700; font-family: monospace; font-size: 1.1rem; flex-shrink: 0; border: 1px solid rgba(99, 102, 241, 0.2);">
-                            v7.6
+                            v7.7
                         </div>
                         <div style="flex: 1;">
                             <h2 style="margin-top: 0; margin-bottom: 6px; font-size: 1.15rem; font-weight: 600; color: var(--text-main);">Version & Dernières Modifications</h2>
-                            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px; font-weight: 500;">Mise à jour : 17 août 2026 à 10:20</div>
+                            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px; font-weight: 500;">Mise à jour : 18 août 2026 à 07:45</div>
                             <p style="color: var(--text-muted); margin: 0; font-size: 0.9rem; line-height: 1.5;">
-                                🧹 <strong>Nettoyage Importation Historique (v7.6)</strong> : Suppression de l'injection automatique en arrière-plan depuis le fichier du dossier, prêt pour vos tests d'importation manuelle via le fichier modèle Excel (.xlsx).
+                                🛠️ <strong>Affichage Intégral Compta & Outils de RAZ Asynchrones (v7.7)</strong> : Inclusion de TOUTES les transactions dans les onglets de comptabilité avec badge Manifestations 🎪, et boutons de suppression asynchrones en lots (RAZ Compta ou RAZ Totale) pour tout vider en 1 clic.
                             </p>
                         </div>
                     </div>
@@ -1120,14 +1120,19 @@
                         </div>
                     </div>
 
-                    <!-- Testing Tool: RAZ Data Button -->
+                    <!-- Testing Tool: RAZ Data Buttons -->
                     <div style="margin-top: 20px; padding-top: 16px; border-top: 1px dashed var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                         <div style="font-size: 0.85rem; color: var(--danger); font-weight: 600; display: flex; align-items: center; gap: 6px;">
-                            <i data-lucide="flask-conical" style="width: 16px; height: 16px;"></i> 🧪 <strong>Outil de Test</strong> : Réinitialise uniquement la compta & manifestations (les paramètres et profils sont conservés).
+                            <i data-lucide="flask-conical" style="width: 16px; height: 16px;"></i> 🧪 <strong>Outils de Remise à Zéro (RAZ)</strong> : Effacez les données de test pour repartir sur une base propre.
                         </div>
-                        <button type="button" class="btn btn-danger" onclick="resetDatabaseForTesting()" style="font-size: 0.85rem; padding: 8px 16px; font-weight: 700;" title="Efface uniquement la compta et les manifestations pour retester vos fichiers Excel (conserve vos paramètres)">
-                            <i data-lucide="trash-2"></i> ⚠️ RAZ Compta & Manifestations
-                        </button>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <button type="button" class="btn btn-danger" onclick="resetDatabaseForTesting('compta')" style="font-size: 0.85rem; padding: 8px 16px; font-weight: 700; background: #dc2626;" title="Efface uniquement la compta et les manifestations pour retester vos fichiers Excel">
+                                <i data-lucide="trash-2"></i> 🧹 RAZ Compta & Manifestations
+                            </button>
+                            <button type="button" class="btn btn-danger" onclick="resetDatabaseForTesting('total')" style="font-size: 0.85rem; padding: 8px 16px; font-weight: 700; background: #991b1b; border-color: #7f1d1d;" title="Remise à Zéro TOTALE : efface toutes les transactions, manifestations, adhérents et notes">
+                                <i data-lucide="alert-triangle"></i> 🔥 RAZ TOTALE de la Base
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -2267,6 +2272,6 @@
     <!-- Expense Category Hover Popover -->
     <div id="expense-category-popover" class="category-popover"></div>
 
-    <script src="app.js?v=7.6"></script>
+    <script src="app.js?v=7.7"></script>
 </body>
 </html>
