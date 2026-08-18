@@ -858,8 +858,15 @@ function renderDashboard() {
     let cash = 0;
     STATE.transactions.forEach(t => {
         if (t.paye && isDateInPeriod(t.date_transaction, STATE.currentPeriod)) {
-            if (t.type_flux === "Recette") cash += Number(t.montant);
-            else cash -= Number(t.montant);
+            if (t.type_flux === "Recette") {
+                cash += Number(t.montant);
+            } else {
+                if (t.manifestation_id) {
+                    cash += Number(t.montant); // Reallocated to manifestation: credited back to general compta
+                } else {
+                    cash -= Number(t.montant);
+                }
+            }
         }
     });
     document.getElementById("dash-cash").innerText = cash.toFixed(2) + " €";
@@ -896,13 +903,14 @@ function renderDashboard() {
     } else {
         sortedTx.forEach(t => {
             const dateStr = formatDateFrench(new Date(t.date_transaction));
-            const amountColor = t.type_flux === "Recette" ? "color: var(--secondary);" : "color: var(--danger);";
-            const amountPrefix = t.type_flux === "Recette" ? "+" : "-";
+            const isReallocated = t.type_flux === "Dépense" && !!t.manifestation_id;
+            const amountColor = (t.type_flux === "Recette" || isReallocated) ? "color: #059669;" : "color: var(--danger);";
+            const displayAmt = isReallocated ? `-${Number(t.montant).toFixed(2)} €` : `${t.type_flux === "Recette" ? "+" : "-"} ${Number(t.montant).toFixed(2)} €`;
             recentTxBody.innerHTML += `
                 <tr>
                     <td>${dateStr}</td>
                     <td>${t.description}</td>
-                    <td style="${amountColor} font-weight: 600;">${amountPrefix} ${Number(t.montant).toFixed(2)} €</td>
+                    <td style="${amountColor} font-weight: 600;">${displayAmt}</td>
                 </tr>
             `;
         });
@@ -1576,11 +1584,13 @@ function renderGeneralExpensesList() {
         const payeBadgeClass = t.paye ? "badge-success" : "badge-warning";
         const payeLabel = t.paye ? "Réglé" : "En attente";
 
+        const isReallocated = !!t.manifestation_id;
+
         let manifBadge = "";
-        if (t.manifestation_id) {
+        if (isReallocated) {
             const m = (STATE.manifestations || []).find(man => man.id === t.manifestation_id);
             const mName = m ? m.nom : "Manifestation";
-            manifBadge = `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); margin-left: 6px; font-size: 0.75rem; font-weight: 600;">🎪 ${mName}</span>`;
+            manifBadge = `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); margin-left: 6px; font-size: 0.75rem; font-weight: 600;" title="Réaffecté à la fête : déduit des dépenses générales">🎪 ${mName} (Déduit)</span>`;
         }
 
         let eqBadge = "";
@@ -1604,12 +1614,15 @@ function renderGeneralExpensesList() {
             chequeBadge = `<span class="badge" style="background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeBorder}; margin-left: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer;" onclick="toggleChequeEncaisse('${t.id}', event)" title="Chèque : Cliquer pour basculer l'état d'encaissement">💳 Chèque${numStr} • <i data-lucide="${iconName}" style="width: 11px; height: 11px; vertical-align: middle; margin-right: 2px;"></i> ${statusText}</span>`;
         }
 
+        const amountStyle = isReallocated ? "color: #059669;" : "color: var(--danger);";
+        const amountStr = isReallocated ? `-${Number(t.montant).toFixed(2)} €` : `${Number(t.montant).toFixed(2)} €`;
+
         listBody.innerHTML += `
             <tr>
                 <td>${dateStr}</td>
                 <td>${catLabel}</td>
                 <td style="font-weight: 500;">${t.description}${manifBadge}${eqBadge}${chequeBadge}</td>
-                <td style="font-weight: 600; text-align: right; color: var(--danger);">${Number(t.montant).toFixed(2)} €</td>
+                <td style="font-weight: 600; text-align: right; ${amountStyle}">${amountStr}</td>
                 <td>
                     <span class="badge ${payeBadgeClass}" style="cursor: pointer;" onclick="toggleTransactionPaid('${t.id}')" title="Changer statut de paiement">
                         ${payeLabel}
