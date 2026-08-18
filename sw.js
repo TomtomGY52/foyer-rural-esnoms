@@ -1,11 +1,11 @@
-const CACHE_NAME = 'foyer-rural-cache-v7.7';
+const CACHE_NAME = 'foyer-rural-cache-v7.8';
 const ASSETS = [
   '/',
-  '/index.html?v=7.7',
-  '/index.css?v=7.7',
-  '/app.js?v=7.7',
-  '/lucide.min.js?v=7.7',
-  '/logo.png?v=7.7'
+  '/index.html?v=7.8',
+  '/index.css?v=7.8',
+  '/app.js?v=7.8',
+  '/lucide.min.js?v=7.8',
+  '/logo.png?v=7.8'
 ];
 
 // Install Event

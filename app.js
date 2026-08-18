@@ -384,7 +384,7 @@ function connectFirebase() {
                         if (col === 'profiles') {
                             STATE.profilesLoaded = true;
                         }
-                        refreshAllViews();
+                        debouncedRefreshAllViews();
                     }, error => {
                         console.error(`Firebase listen error on ${col}:`, error);
                     });
@@ -582,6 +582,14 @@ function saveState() {
 }
 
 // --- Sync Views ---
+let refreshDebounceTimer = null;
+function debouncedRefreshAllViews() {
+    if (refreshDebounceTimer) clearTimeout(refreshDebounceTimer);
+    refreshDebounceTimer = setTimeout(() => {
+        refreshAllViews();
+    }, 60);
+}
+
 function refreshAllViews() {
     // Resolve current user profile
     if (dbMode === 'firebase' && firebase.auth().currentUser) {
@@ -7372,6 +7380,7 @@ function parseAndImportExcelFile(file) {
                         if (!dateRaw && !descRaw && (totalRaw === "" || totalRaw === undefined)) continue;
 
                         const dateStr = parseExcelDateValue(dateRaw);
+                        const desc = String(descRaw || "").trim();
                         const typeFlux = String(r[typeIdx] || "").trim().toLowerCase().includes("recette") ? "Recette" : "Dépense";
                         const catName = String(r[catIdx] || "").trim();
                         let qty = parseExcelNumValue(r[qtyIdx]);
