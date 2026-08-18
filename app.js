@@ -7080,31 +7080,50 @@ function downloadExcelTemplate() {
 
     const wb = XLSX.utils.book_new();
 
-    // 1. Sheet: Transactions
-    const txHeaders = [
-        "Date (AAAA-MM-JJ)", "Type (Recette/Dépense)", "Catégorie", "Description",
+    const headersCompta = [
+        "Date (AAAA-MM-JJ)", "Catégorie", "Description",
         "Montant (€)", "Quantité", "Prix Unitaire (€)", "Moyen de Paiement",
         "Statut (Payé/En attente)", "N° de Chèque", "Chèque Encaissé (Oui/Non)",
         "Adhérent (Nom Prénom)", "Manifestation", "Équipement"
     ];
-    const txData = [
-        txHeaders,
+
+    // 1. Sheet: Dépenses
+    const depensesData = [
+        headersCompta,
         [
-            "2025-01-15", "Recette", "Cotisations Adhérents", "Cotisation annuelle Jean Dupont",
+            "2025-03-12", "Buffet / Buvette", "Achat boissons Métro pour Loto",
+            "320.00", "1", "320.00", "Carte Bancaire",
+            "Payé", "", "Non",
+            "", "Loto 2025", ""
+        ],
+        [
+            "2025-05-15", "Entretien & Réparations", "Achat engrais pour court de tennis",
+            "85.00", "2", "42.50", "Carte Bancaire",
+            "Payé", "", "Non",
+            "", "", ""
+        ]
+    ];
+    const wsDepenses = XLSX.utils.aoa_to_sheet(depensesData);
+
+    // 2. Sheet: Recettes
+    const recettesData = [
+        headersCompta,
+        [
+            "2025-01-15", "Cotisations Adhérents", "Cotisation annuelle Jean Dupont",
             "20.00", "1", "20.00", "Chèque",
             "Payé", "1234567", "Oui",
             "Jean Dupont", "", ""
         ],
         [
-            "2025-03-14", "Dépense", "Buffet / Buvette", "Achat boissons Métro pour Loto",
-            "320.00", "1", "320.00", "Carte Bancaire",
+            "2025-04-10", "Subventions Communales", "Subvention communale annuelle",
+            "2500.00", "1", "2500.00", "Virement",
             "Payé", "", "Non",
-            "", "Loto 2025", ""
+            "", "", ""
         ]
     ];
-    const wsTx = XLSX.utils.aoa_to_sheet(txData);
+    const wsRecettes = XLSX.utils.aoa_to_sheet(recettesData);
 
-    // 2. Sheet: Adhérents
+    // 3. Sheet: Adhérents
     const adhHeaders = [
         "Nom", "Prénom", "Email", "Téléphone", "Adresse",
         "Date d'adhésion (AAAA-MM-JJ)", "Cotisation Réglée (Oui/Non)", "Section"
@@ -7115,7 +7134,7 @@ function downloadExcelTemplate() {
     ];
     const wsAdh = XLSX.utils.aoa_to_sheet(adhData);
 
-    // 3. Sheet: Manifestations
+    // 4. Sheet: Manifestations
     const manHeaders = ["Nom Événement", "Date Début (AAAA-MM-JJ)", "Date Fin (AAAA-MM-JJ)", "Description", "Statut (Terminée/En cours)"];
     const manData = [
         manHeaders,
@@ -7123,7 +7142,7 @@ function downloadExcelTemplate() {
     ];
     const wsMan = XLSX.utils.aoa_to_sheet(manData);
 
-    // 4. Sheet: Investissements
+    // 5. Sheet: Investissements
     const invHeaders = [
         "Libellé Matériel", "Date Acquisition (AAAA-MM-JJ)", "Montant Achat (€)",
         "Durée Amortissement (ans)", "État (Neuf/Occasion)", "Moyen de Paiement",
@@ -7136,7 +7155,8 @@ function downloadExcelTemplate() {
     const wsInv = XLSX.utils.aoa_to_sheet(invData);
 
     // Append sheets to workbook
-    XLSX.utils.book_append_sheet(wb, wsTx, "Transactions");
+    XLSX.utils.book_append_sheet(wb, wsDepenses, "Dépenses");
+    XLSX.utils.book_append_sheet(wb, wsRecettes, "Recettes");
     XLSX.utils.book_append_sheet(wb, wsAdh, "Adhérents");
     XLSX.utils.book_append_sheet(wb, wsMan, "Manifestations");
     XLSX.utils.book_append_sheet(wb, wsInv, "Investissements");
@@ -7153,14 +7173,16 @@ function exportFullDatabaseToExcel() {
 
     const wb = XLSX.utils.book_new();
 
-    // 1. Transactions
-    const txHeaders = [
-        "Date (AAAA-MM-JJ)", "Type (Recette/Dépense)", "Catégorie", "Description",
+    const headersCompta = [
+        "Date (AAAA-MM-JJ)", "Catégorie", "Description",
         "Montant (€)", "Quantité", "Prix Unitaire (€)", "Moyen de Paiement",
         "Statut (Payé/En attente)", "N° de Chèque", "Chèque Encaissé (Oui/Non)",
         "Adhérent (Nom Prénom)", "Manifestation", "Équipement"
     ];
-    const txRows = (STATE.transactions || []).filter(t => isDateInPeriod(t.date_transaction, STATE.currentPeriod)).map(t => {
+
+    const periodTx = (STATE.transactions || []).filter(t => isDateInPeriod(t.date_transaction, STATE.currentPeriod));
+
+    const mapTxRow = t => {
         const cat = (STATE.categories || []).find(c => c.id === t.categorie_id);
         const adh = (STATE.adherents || []).find(a => a.id === t.adherent_id);
         const man = (STATE.manifestations || []).find(m => m.id === t.manifestation_id);
@@ -7172,7 +7194,6 @@ function exportFullDatabaseToExcel() {
 
         return [
             t.date_transaction || "",
-            t.type_flux || "Dépense",
             cat ? cat.nom : "",
             t.description || "",
             Number(t.montant || 0).toFixed(2),
@@ -7186,8 +7207,13 @@ function exportFullDatabaseToExcel() {
             manName,
             eqName
         ];
-    });
-    const wsTx = XLSX.utils.aoa_to_sheet([txHeaders, ...txRows]);
+    };
+
+    const depensesRows = periodTx.filter(t => t.type_flux === "Dépense").map(mapTxRow);
+    const recettesRows = periodTx.filter(t => t.type_flux === "Recette").map(mapTxRow);
+
+    const wsDepenses = XLSX.utils.aoa_to_sheet([headersCompta, ...depensesRows]);
+    const wsRecettes = XLSX.utils.aoa_to_sheet([headersCompta, ...recettesRows]);
 
     // 2. Adhérents
     const adhHeaders = [
@@ -7220,7 +7246,8 @@ function exportFullDatabaseToExcel() {
     ]);
     const wsInv = XLSX.utils.aoa_to_sheet([invHeaders, ...invRows]);
 
-    XLSX.utils.book_append_sheet(wb, wsTx, "Transactions");
+    XLSX.utils.book_append_sheet(wb, wsDepenses, "Dépenses");
+    XLSX.utils.book_append_sheet(wb, wsRecettes, "Recettes");
     XLSX.utils.book_append_sheet(wb, wsAdh, "Adhérents");
     XLSX.utils.book_append_sheet(wb, wsMan, "Manifestations");
     XLSX.utils.book_append_sheet(wb, wsInv, "Investissements");
@@ -7351,22 +7378,26 @@ function parseAndImportExcelFile(file) {
                 // Helper to get category name safely
                 const getCatName = c => String(c ? (c.nom || c.libelle || "") : "").toLowerCase().trim();
 
-                // 1. Sheet: Transactions
-                if (nameLower.includes("transaction") || nameLower.includes("compta") || nameLower.includes("dépense") || nameLower.includes("recette") || sheetIndex === 0) {
+                // 1. Sheet: Transactions / Dépenses / Recettes
+                if (nameLower.includes("transaction") || nameLower.includes("compta") || nameLower.includes("dépense") || nameLower.includes("depense") || nameLower.includes("recette") || (sheetIndex === 0 && !nameLower.includes("adhérent") && !nameLower.includes("manifestation") && !nameLower.includes("invest"))) {
+                    let forcedType = "";
+                    if (nameLower.includes("dépense") || nameLower.includes("depense")) forcedType = "Dépense";
+                    else if (nameLower.includes("recette")) forcedType = "Recette";
+
                     const dateIdx = findColIndex(headers, ["date"], 0);
-                    const typeIdx = findColIndex(headers, ["type", "flux"], 1);
-                    const catIdx = findColIndex(headers, ["catégorie", "categorie", "rubrique"], 2);
-                    const descIdx = findColIndex(headers, ["description", "libellé", "libelle", "objet", "intitulé"], 3);
-                    const totalIdx = findColIndex(headers, ["montant", "total", "somme"], 4);
-                    const qtyIdx = findColIndex(headers, ["quantité", "quantite", "qte"], 5);
-                    const priceIdx = findColIndex(headers, ["unitaire", "prix u"], 6);
-                    const moyenIdx = findColIndex(headers, ["moyen", "paiement", "règlement", "mode"], 7);
-                    const statusIdx = findColIndex(headers, ["statut", "état", "etat", "payé"], 8);
-                    const chequeNumIdx = findColIndex(headers, ["n°", "num", "numéro"], 9);
-                    const chequeEncIdx = findColIndex(headers, ["encaissé", "encaisse", "débité", "debit"], 10);
-                    const adhIdx = findColIndex(headers, ["adhérent", "adherant", "adherent", "membre", "client"], 11);
-                    const manIdx = findColIndex(headers, ["manifestation", "événement", "evenement", "fête"], 12);
-                    const eqIdx = findColIndex(headers, ["équipement", "equipement", "matériel"], 13);
+                    const typeIdx = findColIndex(headers, ["type", "flux"], -1);
+                    const catIdx = findColIndex(headers, ["catégorie", "categorie", "rubrique"], typeIdx === -1 ? 1 : 2);
+                    const descIdx = findColIndex(headers, ["description", "libellé", "libelle", "objet", "intitulé"], typeIdx === -1 ? 2 : 3);
+                    const totalIdx = findColIndex(headers, ["montant", "total", "somme"], typeIdx === -1 ? 3 : 4);
+                    const qtyIdx = findColIndex(headers, ["quantité", "quantite", "qte"], typeIdx === -1 ? 4 : 5);
+                    const priceIdx = findColIndex(headers, ["unitaire", "prix u"], typeIdx === -1 ? 5 : 6);
+                    const moyenIdx = findColIndex(headers, ["moyen", "paiement", "règlement", "mode"], typeIdx === -1 ? 6 : 7);
+                    const statusIdx = findColIndex(headers, ["statut", "état", "etat", "payé"], typeIdx === -1 ? 7 : 8);
+                    const chequeNumIdx = findColIndex(headers, ["n°", "num", "numéro"], typeIdx === -1 ? 8 : 9);
+                    const chequeEncIdx = findColIndex(headers, ["encaissé", "encaisse", "débité", "debit"], typeIdx === -1 ? 9 : 10);
+                    const adhIdx = findColIndex(headers, ["adhérent", "adherant", "adherent", "membre", "client"], typeIdx === -1 ? 10 : 11);
+                    const manIdx = findColIndex(headers, ["manifestation", "événement", "evenement", "fête"], typeIdx === -1 ? 11 : 12);
+                    const eqIdx = findColIndex(headers, ["équipement", "equipement", "matériel"], typeIdx === -1 ? 12 : 13);
 
                     for (let i = 1; i < rows.length; i++) {
                         const r = rows[i];
@@ -7381,7 +7412,11 @@ function parseAndImportExcelFile(file) {
 
                         const dateStr = parseExcelDateValue(dateRaw);
                         const desc = String(descRaw || "").trim();
-                        const typeFlux = String(r[typeIdx] || "").trim().toLowerCase().includes("recette") ? "Recette" : "Dépense";
+                        let typeFlux = forcedType;
+                        if (!typeFlux) {
+                            const rawType = typeIdx !== -1 ? String(r[typeIdx] || "").trim().toLowerCase() : "";
+                            typeFlux = rawType.includes("recette") ? "Recette" : "Dépense";
+                        }
                         const catName = String(r[catIdx] || "").trim();
                         let qty = parseExcelNumValue(r[qtyIdx]);
                         let priceUnit = parseExcelNumValue(r[priceIdx]);
