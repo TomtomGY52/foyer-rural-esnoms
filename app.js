@@ -834,6 +834,9 @@ function applyPermissionsToModal(modalId) {
 function openModal(id) {
     const el = document.getElementById(id);
     if (el) {
+        if (id === 'modal-transaction') {
+            populateSelectOptions();
+        }
         el.classList.add("active");
         applyPermissionsToModal(id);
     }
@@ -1868,6 +1871,9 @@ function editTransaction(id) {
     const t = STATE.transactions.find(item => item.id === id);
     if (!t) return;
     
+    // Repopulate selects guaranteeing t.manifestation_id is included even if it's from another period
+    populateSelectOptions(t.manifestation_id || "");
+
     document.getElementById("transaction-id").value = t.id;
     document.getElementById("transaction-flux").value = t.type_flux;
     document.getElementById("transaction-date").value = t.date_transaction;
@@ -3947,33 +3953,54 @@ function getDemoDataStateObj() {
 // ============================================================================
 // --- 15. SELECT DROPDOWNS POPULATION ---
 // ============================================================================
-function populateSelectOptions() {
+function populateSelectOptions(selectedManifId = null) {
     updateTransactionCategoriesDropdown();
 
     // 2. Transaction form links
     const txAdherent = document.getElementById("transaction-adherent");
-    txAdherent.innerHTML = `<option value="">-- Aucun --</option>`;
-    STATE.adherents.forEach(a => {
-        txAdherent.innerHTML += `<option value="${a.id}">👤 Adhérent: ${a.prenom} ${a.nom}</option>`;
-    });
+    if (txAdherent) {
+        txAdherent.innerHTML = `<option value="">-- Aucun --</option>`;
+        STATE.adherents.forEach(a => {
+            txAdherent.innerHTML += `<option value="${a.id}">👤 Adhérent: ${a.prenom} ${a.nom}</option>`;
+        });
+    }
 
     const txManif = document.getElementById("transaction-manifestation");
-    txManif.innerHTML = `<option value="">-- Aucun --</option>`;
-    STATE.manifestations.forEach(m => {
-        txManif.innerHTML += `<option value="${m.id}">🎁 Événement: ${m.nom}</option>`;
-    });
+    if (txManif) {
+        const currentVal = selectedManifId !== null ? selectedManifId : txManif.value;
+        txManif.innerHTML = `<option value="">-- Aucun --</option>`;
+
+        // Filter manifestations to ONLY show those belonging to the current active period
+        const periodManifs = STATE.manifestations.filter(m => {
+            if (currentVal && m.id === currentVal) return true; // Keep currently selected item when editing
+            if (!m.date_debut) return true;
+            return isDateInPeriod(m.date_debut, STATE.currentPeriod);
+        });
+
+        periodManifs.forEach(m => {
+            txManif.innerHTML += `<option value="${m.id}">🎁 Événement: ${m.nom}</option>`;
+        });
+
+        if (currentVal) {
+            txManif.value = currentVal;
+        }
+    }
 
     const txInvest = document.getElementById("transaction-investissement");
-    txInvest.innerHTML = `<option value="">-- Aucun --</option>`;
-    STATE.investissements.forEach(inv => {
-        txInvest.innerHTML += `<option value="${inv.id}">🔧 Invest: ${inv.libelle}</option>`;
-    });
+    if (txInvest) {
+        txInvest.innerHTML = `<option value="">-- Aucun --</option>`;
+        STATE.investissements.forEach(inv => {
+            txInvest.innerHTML += `<option value="${inv.id}">🔧 Invest: ${inv.libelle}</option>`;
+        });
+    }
 
     const txProd = document.getElementById("transaction-produit");
-    txProd.innerHTML = `<option value="">-- Aucun --</option>`;
-    STATE.produits.forEach(p => {
-        txProd.innerHTML += `<option value="${p.id}">🍺 Boisson: ${p.nom_boisson}</option>`;
-    });
+    if (txProd) {
+        txProd.innerHTML = `<option value="">-- Aucun --</option>`;
+        STATE.produits.forEach(p => {
+            txProd.innerHTML += `<option value="${p.id}">🍺 Boisson: ${p.nom_boisson}</option>`;
+        });
+    }
 
     const txEquip = document.getElementById("transaction-equipement");
     if (txEquip) {
@@ -4034,18 +4061,30 @@ function populateSelectOptions() {
 
     const filterManif = document.getElementById("filter-manifestation");
     if (filterManif) {
+        const val = filterManif.value;
         filterManif.innerHTML = `<option value="all">Toutes les manifestations</option>`;
-        STATE.manifestations.forEach(m => {
+        const periodManifs = STATE.manifestations.filter(m => !m.date_debut || isDateInPeriod(m.date_debut, STATE.currentPeriod));
+        periodManifs.forEach(m => {
             filterManif.innerHTML += `<option value="${m.id}">${m.nom}</option>`;
         });
+        if (val) filterManif.value = val;
     }
 
     // 4. Meeting Notes manifestations link options
     const noteManif = document.getElementById("edit-note-manif");
-    noteManif.innerHTML = `<option value="">-- Aucun événement lié --</option>`;
-    STATE.manifestations.forEach(m => {
-        noteManif.innerHTML += `<option value="${m.id}">${m.nom}</option>`;
-    });
+    if (noteManif) {
+        const val = noteManif.value;
+        noteManif.innerHTML = `<option value="">-- Aucun événement lié --</option>`;
+        const periodManifs = STATE.manifestations.filter(m => {
+            if (val && m.id === val) return true;
+            if (!m.date_debut) return true;
+            return isDateInPeriod(m.date_debut, STATE.currentPeriod);
+        });
+        periodManifs.forEach(m => {
+            noteManif.innerHTML += `<option value="${m.id}">${m.nom}</option>`;
+        });
+        if (val) noteManif.value = val;
+    }
 
     // 5. Populate manifestation fete-expense-cat dropdown dynamically
     const feteExpenseCat = document.getElementById("fete-expense-cat");
