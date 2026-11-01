@@ -16,19 +16,19 @@
             errDiv.textContent += '\nError: ' + e.message + ' at ' + e.filename + ':' + e.lineno + ':' + e.colno;
         });
     </script>
-    <link rel="stylesheet" href="index.css?v=8.1">
+    <link rel="stylesheet" href="index.css?v=8.4">
     
     <!-- Favicon & PWA Icons -->
-    <link rel="icon" type="image/png" href="logo.png?v=8.1">
-    <link rel="shortcut icon" type="image/png" href="logo.png?v=8.1">
-    <link rel="manifest" href="manifest.json?v=8.1">
-    <link rel="apple-touch-icon" href="logo.png?v=8.1">
+    <link rel="icon" type="image/png" href="logo.png?v=8.4">
+    <link rel="shortcut icon" type="image/png" href="logo.png?v=8.4">
+    <link rel="manifest" href="manifest.json?v=8.4">
+    <link rel="apple-touch-icon" href="logo.png?v=8.4">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js?v=8.1')
+                navigator.serviceWorker.register('sw.js?v=8.4')
                     .then(reg => {
                         console.log('Service Worker registered successfully!', reg);
                         reg.update(); // Force immediate update check on load
@@ -52,20 +52,16 @@
     <!-- SheetJS CDN for Excel (.xlsx) Import/Export -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- Lucide Icons (Local Bundle) -->
-    <script src="lucide.min.js?v=8.1"></script>
-    <!-- Firebase Compat SDKs (allows running from file:// without CORS module issues) -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
-    <script src="/__/firebase/init.js"></script>
+    <script src="lucide.min.js?v=8.4"></script>
+    <!-- Supabase JS Client v2 (100% Cloud Backend) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
     <div id="main-bg-watermark" style="position: fixed; top: 50%; left: calc(50% + 130px); transform: translate(-50%, -50%) translateZ(0); width: 500px; height: 500px; background-size: contain; background-repeat: no-repeat; background-position: center; pointer-events: none; opacity: 0.05; z-index: -1; -webkit-backface-visibility: hidden; backface-visibility: hidden;"></div>
     <div id="login-screen" style="display: none;">
         <div class="login-box">
             <div class="login-header">
-                <img src="logo.png?v=8.1" alt="Logo" class="login-logo" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px;" id="login-logo-img">
+                <img src="logo.png?v=8.4" alt="Logo" class="login-logo" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px;" id="login-logo-img">
                 <h2>Foyer Rural d'Esnoms au Val</h2>
                 <p>Espace d'Administration Sécurisé</p>
             </div>
@@ -95,7 +91,7 @@
                 <i data-lucide="menu" style="width: 20px; height: 20px;"></i>
             </button>
             <div style="display: flex; align-items: center; gap: 8px;">
-                <img id="mobile-header-logo" src="logo.png?v=8.1" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;" />
+                <img id="mobile-header-logo" src="logo.png?v=8.4" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;" />
                 <span style="font-weight: 700; font-size: 0.95rem; color: var(--text-main);">Foyer Rural</span>
             </div>
             <div style="width: 36px;"></div>
@@ -108,7 +104,7 @@
         <aside class="sidebar">
             <div class="logo-container" style="border-bottom: none; padding-bottom: 0; display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px;">
                 <div class="logo-details" style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
-                    <img id="sidebar-logo" src="logo.png?v=8.1" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
+                    <img id="sidebar-logo" src="logo.png?v=8.4" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
                     <span class="logo-title" style="white-space: nowrap;">Foyer Rural d'Esnoms au Val</span>
                 </div>
                 <!-- Sidebar Toggle Button (Inside Sidebar Logo Container) -->
@@ -139,7 +135,7 @@
                     <li><a class="nav-item" data-tab="reserve"><i data-lucide="beer"></i> Boissons & Réserve</a></li>
                     <li><a class="nav-item" data-tab="investissements"><i data-lucide="trending-up"></i> Investissements</a></li>
                     <li><a class="nav-item" data-tab="notes"><i data-lucide="file-text"></i> Réunions & Notes</a></li>
-                    <li><a class="nav-item" data-tab="settings"><i data-lucide="settings"></i> Paramètres / Firebase</a></li>
+                    <li><a class="nav-item" data-tab="settings"><i data-lucide="settings"></i> Paramètres / Supabase</a></li>
                 </ul>
             </nav>
             <div class="db-status-container">
@@ -994,8 +990,8 @@
             <section id="tab-settings" class="tab-pane">
                 <div class="content-header">
                     <div class="header-title">
-                        <h1>Paramètres & Configuration Firebase</h1>
-                        <p>Gérez les sauvegardes locales ou configurez la synchronisation Cloud avec Firebase.</p>
+                        <h1>Paramètres & Configuration Supabase</h1>
+                        <p>Gérez les sauvegardes locales ou configurez la synchronisation Cloud avec Supabase (PostgreSQL).</p>
                     </div>
                 </div>
 
@@ -1003,13 +999,13 @@
                     <!-- Version & Release Info Panel -->
                     <div class="glass-panel" style="grid-column: 1 / -1; display: flex; gap: 24px; align-items: flex-start; padding: 24px;">
                         <div style="background: rgba(99, 102, 241, 0.1); color: var(--primary); padding: 8px 14px; border-radius: 8px; font-weight: 700; font-family: monospace; font-size: 1.1rem; flex-shrink: 0; border: 1px solid rgba(99, 102, 241, 0.2);">
-                            v8.1
+                            v8.4
                         </div>
                         <div style="flex: 1;">
                             <h2 style="margin-top: 0; margin-bottom: 6px; font-size: 1.15rem; font-weight: 600; color: var(--text-main);">Version & Dernières Modifications</h2>
-                            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px; font-weight: 500;">Mise à jour : 18 août 2026 à 08:41</div>
+                            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px; font-weight: 500;">Mise à jour : 1 novembre 2026</div>
                             <p style="color: var(--text-muted); margin: 0; font-size: 0.9rem; line-height: 1.5;">
-                                🎯 <strong>Filtrage des Manifestations par Période Active (v8.1)</strong> : Les listes déroulantes des événements (saisie de transactions, filtres et réunions) n'affichent plus désormais que les manifestations appartenant à l'exercice comptable sélectionné.
+                                🚀 <strong>Synchronisation Complète Firestore vers Supabase Cloud & Déploiement (v8.4)</strong> : Migration exhaustive de toutes les données réelles issues de Firestore vers Supabase Cloud PostgreSQL (488 transactions, 55 adhérents, 22 manifestations dont les saisons 2025/2026, 32 catégories, investissements et notes). Déploiement en ligne effectif sur l'hébergement web et conversion automatique robuste des formats de date (<code>toIsoDate</code>).
                             </p>
                         </div>
                     </div>
@@ -1034,35 +1030,36 @@
                         </div>
                     </div>
 
-                    <!-- Firebase Setup Panel -->
+                    <!-- Supabase Setup Panel -->
                     <div class="glass-panel">
-                        <h2>Configuration Firebase / Cloud</h2>
+                        <h2>Configuration Supabase / Cloud (PostgreSQL)</h2>
                         <p style="color: var(--text-muted); margin: 12px 0 20px 0; font-size: 0.9rem; line-height: 1.5;">
-                            Connectez votre application à Firebase Firestore pour activer la synchronisation en temps réel et y accéder sur votre smartphone ou d'autres appareils.
+                            Connectez votre application à Supabase Cloud pour activer la synchronisation relationnelle en temps réel et y accéder sur votre smartphone ou d'autres appareils.
                         </p>
-                        <form id="firebase-config-form" onsubmit="saveFirebaseConfig(event)">
+                        <form id="supabase-config-form" onsubmit="saveSupabaseConfig(event)">
                             <div class="form-group">
-                                <label for="fb-apiKey">API Key</label>
-                                <input type="text" id="fb-apiKey" required>
+                                <label for="sb-url">URL Supabase</label>
+                                <input type="url" id="sb-url" placeholder="https://xyz.supabase.co" required>
                             </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="fb-projectId">Project ID</label>
-                                    <input type="text" id="fb-projectId" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="fb-appId">App ID</label>
-                                    <input type="text" id="fb-appId" required>
-                                </div>
+                            <div class="form-group">
+                                <label for="sb-anonKey">Clé Publique (Anon Key)</label>
+                                <input type="text" id="sb-anonKey" placeholder="eyJhbGciOi..." required>
+                            </div>
+                            <div class="form-group">
+                                <label for="sb-projectRef">Identifiant Projet (Project Ref)</label>
+                                <input type="text" id="sb-projectRef" placeholder="rdnxnksdgrxidmrlgotz" required>
                             </div>
                             <div class="form-group checkbox-group" style="margin-bottom: 20px;">
-                                <input type="checkbox" id="fb-enabled">
-                                <label for="fb-enabled" style="margin-bottom: 0; cursor: pointer;">Activer la synchronisation Firebase</label>
+                                <input type="checkbox" id="sb-enabled" checked>
+                                <label for="sb-enabled" style="margin-bottom: 0; cursor: pointer;">Activer la synchronisation Supabase Cloud</label>
                             </div>
-                            <div style="display: flex; gap: 12px;">
+                            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
                                 <button type="submit" class="btn btn-primary">Enregistrer Configuration</button>
-                                <button type="button" id="btn-sync-local-to-fb" class="btn btn-success" style="display: none;" onclick="migrateLocalToFirebase()">
-                                    <i data-lucide="cloud-lightning"></i> Envoyer les Données Locales vers Cloud
+                                <button type="button" id="btn-sync-local-to-sb" class="btn btn-success" onclick="migrateLocalToSupabase()">
+                                    <i data-lucide="cloud-lightning"></i> Envoyer Données Locales vers Supabase
+                                </button>
+                                <button type="button" class="btn btn-secondary" onclick="syncFromSupabase()">
+                                    <i data-lucide="refresh-cw"></i> Recharger depuis Supabase
                                 </button>
                             </div>
                         </form>
@@ -2272,6 +2269,6 @@
     <!-- Expense Category Hover Popover -->
     <div id="expense-category-popover" class="category-popover"></div>
 
-    <script src="app.js?v=8.1"></script>
+    <script src="app.js?v=8.4"></script>
 </body>
 </html>

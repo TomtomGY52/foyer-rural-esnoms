@@ -1,5 +1,7 @@
 // ============================================================================
 // Safe Lucide icon rendering helper
+const APP_VERSION = "8.4";
+
 function safeCreateIcons() {
     if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
         try {
@@ -20,6 +22,8 @@ let STATE = {
     produits: [],
     reservations: [],
     notes: [],
+    supabaseConfig: null,
+    supabaseEnabled: true,
     firebaseConfig: null,
     firebaseEnabled: false,
     feteRuraleStands: [],
@@ -38,14 +42,29 @@ let STATE = {
 };
 
 // Mode indicators
-let dbMode = 'local'; // 'local' or 'firebase'
-let db = null; // Firestore reference
+let dbMode = 'local'; // 'local', 'supabase', or 'firebase'
+let db = null; // Active database adapter reference
+let activeCloudListeners = [];
 let currentWeekStartDate = new Date(); // Active tennis calendar week
 let financeChartInstance = null;
 let categoryChartInstance = null;
 let manifestationChartInstance = null;
 let selectedNoteId = null;
 let activeManifestationId = null;
+
+function isCloudDb() {
+    return dbMode === 'supabase' || dbMode === 'firebase';
+}
+
+function getCurrentUser() {
+    if (window.supabaseSession && window.supabaseSession.user) {
+        return window.supabaseSession.user;
+    }
+    if (window.firebase && typeof firebase.auth === 'function' && firebase.auth().currentUser) {
+        return firebase.auth().currentUser;
+    }
+    return null;
+}
 
 let SORTS = {
     transactions: { field: 'date_transaction', direction: 'desc' },
@@ -127,37 +146,33 @@ document.addEventListener("DOMContentLoaded", () => {
 function initApp() {
     initPeriod();
     
-    // 1. Check if running on Firebase Hosting (auto-initialized by /__/firebase/init.js)
-    const isFirebaseHosted = window.location.hostname.endsWith(".web.app") || 
-                             window.location.hostname.endsWith(".firebaseapp.com") ||
-                             (window.firebase && firebase.apps.length > 0);
+    // 1. Supabase Configuration (Primary Cloud Backend)
+    const savedSbConfig = localStorage.getItem("foyer_supabase_config");
+    const savedSbEnabled = localStorage.getItem("foyer_supabase_enabled");
+    
+    STATE.supabaseConfig = savedSbConfig ? JSON.parse(savedSbConfig) : DEFAULT_SUPABASE_CONFIG;
+    STATE.supabaseEnabled = savedSbEnabled !== null ? (savedSbEnabled === "true") : true;
 
-    if (isFirebaseHosted) {
-        STATE.firebaseEnabled = true;
-        document.getElementById("fb-enabled").checked = true;
-    } else {
-        // Load configuration from localStorage to see if Firebase is configured/enabled locally
-        const savedConfig = localStorage.getItem("foyer_firebase_config");
-        const savedEnabled = localStorage.getItem("foyer_firebase_enabled");
-        
-        if (savedConfig) {
-            STATE.firebaseConfig = JSON.parse(savedConfig);
-            document.getElementById("fb-apiKey").value = STATE.firebaseConfig.apiKey || "";
-            document.getElementById("fb-projectId").value = STATE.firebaseConfig.projectId || "";
-            document.getElementById("fb-appId").value = STATE.firebaseConfig.appId || "";
-        }
-        
-        if (savedEnabled === "true" && STATE.firebaseConfig) {
-            STATE.firebaseEnabled = true;
-            document.getElementById("fb-enabled").checked = true;
-        }
-    }
+    // Populate Supabase form in Settings tab
+    const sbUrlInput = document.getElementById("sb-url");
+    const sbAnonInput = document.getElementById("sb-anonKey");
+    const sbRefInput = document.getElementById("sb-projectRef");
+    const sbEnabledInput = document.getElementById("sb-enabled");
+    if (sbUrlInput) sbUrlInput.value = STATE.supabaseConfig.url || "";
+    if (sbAnonInput) sbAnonInput.value = STATE.supabaseConfig.anonKey || "";
+    if (sbRefInput) sbRefInput.value = STATE.supabaseConfig.projectRef || "";
+    if (sbEnabledInput) sbEnabledInput.checked = STATE.supabaseEnabled;
+
+    // Fallback Firebase check
+    const savedFbConfig = localStorage.getItem("foyer_firebase_config");
+    const savedFbEnabled = localStorage.getItem("foyer_firebase_enabled");
+    if (savedFbConfig) STATE.firebaseConfig = JSON.parse(savedFbConfig);
+    if (savedFbEnabled === "true") STATE.firebaseEnabled = true;
 
     // 2. Initialize database connection
-    if (isFirebaseHosted || (STATE.firebaseConfig && STATE.firebaseConfig.apiKey)) {
-        STATE.firebaseEnabled = true;
-        const fbCheckbox = document.getElementById("fb-enabled");
-        if (fbCheckbox) fbCheckbox.checked = true;
+    if (STATE.supabaseEnabled && typeof window.supabase !== 'undefined') {
+        connectSupabase();
+    } else if (STATE.firebaseEnabled && STATE.firebaseConfig && STATE.firebaseConfig.apiKey) {
         connectFirebase();
     } else {
         connectLocal();
@@ -273,39 +288,512 @@ function connectLocal() {
     }
 }
 
-// --- Firebase Cloud Storage Database Mode ---
+// --- Supabase Cloud Database Configuration ---
+const DEFAULT_SUPABASE_CONFIG = {
+    url: "https://rdnxnksdgrxidmrlgotz.supabase.co",
+    anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkbnhua3NkZ3J4aWRtcmxnb3R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMTk0NjEsImV4cCI6MjEwODc5NTQ2MX0.Iug7ZmxXY-ME43wZo_PhPT8KXfZ4idz92tZ4kiL5HVQ",
+    projectRef: "rdnxnksdgrxidmrlgotz"
+};
+
+const COLLECTION_TABLE_MAP = {
+    'feteRuraleStands': 'fete_rurale_stands',
+    'feteRuraleReceipts': 'fete_rurale_receipts',
+    'feteRuraleExpenses': 'fete_rurale_expenses',
+    'feteRuralePartners': 'fete_rurale_partners',
+    'evolutionNotes': 'evolution_notes',
+    'sharedEquipments': 'shared_equipments',
+    'partnerAssociations': 'partner_associations'
+};
+
+function getTableName(col) {
+    return COLLECTION_TABLE_MAP[col] || col;
+}
+
+const TABLE_COLUMNS = {
+    adherents: ['id', 'numero_adherent', 'nom', 'prenom', 'email', 'date_adhesion', 'cotisation_a_jour', 'gestanet_periods', 'created_at', 'telephone', 'adresse', 'section', 'sexe', 'date_naissance', 'cotisation_reglee'],
+    categories: ['id', 'libelle', 'type', 'created_at'],
+    manifestations: ['id', 'nom', 'date_debut', 'date_fin', 'lieu', 'budget_prevu', 'statut', 'description', 'created_at', 'special'],
+    investissements: ['id', 'libelle', 'date_acquisition', 'montant_achat', 'duree_amortissement_ans', 'etat', 'moyen_payement', 'num_cheque', 'cheque_encaisse', 'remarques', 'valeur_residuelle', 'created_at'],
+    produits: ['id', 'nom_boisson', 'prix', 'quantite_stock', 'seuil_alerte', 'unite', 'contenance', 'categorie_stock', 'created_at'],
+    reservations: ['id', 'date', 'hour', 'adherent_id', 'court', 'created_at'],
+    notes: ['id', 'titre', 'date_reunion', 'contenu', 'manifestation_id', 'created_at'],
+    transactions: ['id', 'type_flux', 'date_transaction', 'categorie_id', 'description', 'montant', 'quantite', 'prix', 'moyen_payement', 'paye', 'num_cheque', 'cheque_encaisse', 'date_encaissement', 'adherent_id', 'manifestation_id', 'investissement_id', 'produit_id', 'equipement_id', 'shared_equipment_id', 'num_recu', 'facture_client_nom', 'facture_numero', 'reallocated', 'created_at', 'exercice', 'categorie_nom', 'manifestation_nom', 'statut', 'prix_unitaire'],
+    fete_rurale_stands: ['id', 'nom', 'fond_de_caisse', 'manifestation_id', 'created_at'],
+    fete_rurale_receipts: ['id', 'stand_id', 'manifestation_id', 'date', 'montant', 'comment', 'transaction_id', 'created_at'],
+    fete_rurale_expenses: ['id', 'manifestation_id', 'description', 'date', 'montant', 'paye', 'moyen_payement', 'paye_a', 'categorie', 'commentaire', 'scan', 'transaction_id', 'created_at'],
+    fete_rurale_partners: ['id', 'manifestation_id', 'entreprise', 'contact', 'suivi_par', 'paye', 'moyen_payement', 'montant_sponsoring', 'logo', 'transaction_id', 'created_at'],
+    profiles: ['id', 'name', 'email', 'password', 'permissions', 'role', 'created_at'],
+    evolution_notes: ['id', 'text', 'type', 'status', 'created_at'],
+    shared_equipments: ['id', 'nom', 'description', 'partners', 'created_at'],
+    partner_associations: ['id', 'nom', 'contact', 'email', 'phone', 'adresse', 'siret', 'created_at'],
+    settings: ['id', 'data', 'created_at', 'updated_at']
+};
+
+const DATE_COLUMNS = new Set(['date_adhesion', 'date_debut', 'date_fin', 'date_acquisition', 'date', 'date_reunion', 'date_transaction', 'date_encaissement']);
+const NUMERIC_COLUMNS = new Set(['montant', 'quantite', 'prix', 'budget_prevu', 'montant_achat', 'duree_amortissement_ans', 'valeur_residuelle', 'quantite_stock', 'seuil_alerte', 'fond_de_caisse', 'montant_sponsoring', 'prix_unitaire']);
+const BOOLEAN_COLUMNS = new Set(['cotisation_a_jour', 'cotisation_reglee', 'paye', 'cheque_encaisse', 'reallocated', 'special']);
+const JSON_COLUMNS = new Set(['permissions', 'partners', 'data', 'gestanet_periods']);
+
+function toIsoDate(val) {
+    if (!val) return null;
+    const s = String(val).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return null;
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+function sanitizeForPostgres(table, data) {
+    if (!data || typeof data !== 'object') return data;
+    if (table === 'settings') return data;
+    
+    const validCols = TABLE_COLUMNS[table];
+    const out = {};
+    for (const key of Object.keys(data)) {
+        if (validCols && !validCols.includes(key)) continue;
+        const val = data[key];
+        
+        if (DATE_COLUMNS.has(key)) {
+            out[key] = (val === '' || val === undefined || val === null) ? null : toIsoDate(val);
+        } else if (NUMERIC_COLUMNS.has(key)) {
+            out[key] = (val === '' || val === undefined || val === null) ? (key === 'quantite' ? 1 : 0) : (Number(val) || 0);
+        } else if (BOOLEAN_COLUMNS.has(key)) {
+            out[key] = Boolean(val);
+        } else if (JSON_COLUMNS.has(key)) {
+            if (key === 'gestanet_periods') {
+                out[key] = Array.isArray(val) ? val : [];
+            } else {
+                out[key] = val && typeof val === 'object' ? val : {};
+            }
+        } else if (typeof val === 'string') {
+            if (val === '' && (key.endsWith('_id') || key === 'court' || key === 'scan' || key === 'logo')) {
+                out[key] = null;
+            } else {
+                out[key] = val;
+            }
+        } else if (val === undefined) {
+            out[key] = null;
+        } else {
+            out[key] = val;
+        }
+    }
+    return out;
+}
+
+// Upload file to Supabase Public Storage bucket 'foyer-rural'
+async function uploadFileToStorage(file, folder = 'uploads') {
+    if (window.supabaseClient) {
+        const fileExt = file.name ? file.name.split('.').pop() : 'bin';
+        const cleanExt = (fileExt || 'bin').replace(/[^a-zA-Z0-9]/g, '');
+        const filePath = `${folder}/${Date.now()}_${Math.random().toString(36).substr(2, 6)}.${cleanExt}`;
+        const { data, error } = await window.supabaseClient.storage
+            .from('foyer-rural')
+            .upload(filePath, file, { cacheControl: '3600', upsert: true });
+        if (error) {
+            console.error("Storage upload error:", error);
+            throw error;
+        }
+        const { data: pubData } = window.supabaseClient.storage
+            .from('foyer-rural')
+            .getPublicUrl(filePath);
+        return pubData.publicUrl;
+    }
+    throw new Error("Supabase Storage non disponible.");
+}
+
+function createSupabaseDbAdapter(supabaseClient) {
+    function collection(col) {
+        const tbl = getTableName(col);
+        return {
+            doc(id) {
+                return {
+                    id,
+                    ref: { id, col },
+                    async set(data, options = {}) {
+                        let payload = { id, ...data };
+                        if (col === 'settings') {
+                            if (options && options.merge) {
+                                const { data: existing } = await supabaseClient.from('settings').select('data').eq('id', id).maybeSingle();
+                                const merged = { ...(existing?.data || {}), ...data };
+                                payload = { id, data: merged, updated_at: new Date().toISOString() };
+                            } else {
+                                payload = { id, data, updated_at: new Date().toISOString() };
+                            }
+                        } else {
+                            payload = sanitizeForPostgres(tbl, payload);
+                        }
+                        const { error } = await supabaseClient.from(tbl).upsert(payload);
+                        if (error) {
+                            console.error(`Supabase set error on ${col}/${id}:`, error);
+                            throw error;
+                        }
+                    },
+                    async update(data) {
+                        if (col === 'settings') {
+                            const { data: existing } = await supabaseClient.from('settings').select('data').eq('id', id).maybeSingle();
+                            const merged = { ...(existing?.data || {}), ...data };
+                            const { error } = await supabaseClient.from('settings').upsert({ id, data: merged, updated_at: new Date().toISOString() });
+                            if (error) throw error;
+                            return;
+                        }
+                        const payload = sanitizeForPostgres(tbl, data);
+                        const { error } = await supabaseClient.from(tbl).update(payload).eq('id', id);
+                        if (error) {
+                            console.error(`Supabase update error on ${col}/${id}:`, error);
+                            throw error;
+                        }
+                    },
+                    async delete() {
+                        const { error } = await supabaseClient.from(tbl).delete().eq('id', id);
+                        if (error) {
+                            console.error(`Supabase delete error on ${col}/${id}:`, error);
+                            throw error;
+                        }
+                    },
+                    async get() {
+                        const { data, error } = await supabaseClient.from(tbl).select('*').eq('id', id).maybeSingle();
+                        if (error) throw error;
+                        return {
+                            exists: !!data,
+                            data: () => data ? (col === 'settings' ? (data.data || {}) : data) : null
+                        };
+                    },
+                    onSnapshot(callback, errorCallback) {
+                        supabaseClient.from(tbl).select('*').eq('id', id).maybeSingle()
+                            .then(({ data, error }) => {
+                                if (error) {
+                                    if (errorCallback) errorCallback(error);
+                                    return;
+                                }
+                                callback({
+                                    exists: !!data,
+                                    data: () => data ? (col === 'settings' ? (data.data || {}) : data) : null
+                                });
+                            })
+                            .catch(err => {
+                                if (errorCallback) errorCallback(err);
+                            });
+
+                        const chName = `ch_doc_${col}_${id}_${Date.now()}`;
+                        const ch = supabaseClient.channel(chName)
+                            .on('postgres_changes', { event: '*', schema: 'public', table: tbl, filter: `id=eq.${id}` }, async () => {
+                                const { data } = await supabaseClient.from(tbl).select('*').eq('id', id).maybeSingle();
+                                callback({
+                                    exists: !!data,
+                                    data: () => data ? (col === 'settings' ? (data.data || {}) : data) : null
+                                });
+                            })
+                            .subscribe();
+
+                        return () => {
+                            supabaseClient.removeChannel(ch);
+                        };
+                    }
+                };
+            },
+            async add(data) {
+                const id = data.id || ('doc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6));
+                let payload = { id, ...data };
+                if (col === 'settings') {
+                    payload = { id, data, updated_at: new Date().toISOString() };
+                } else {
+                    payload = sanitizeForPostgres(tbl, payload);
+                }
+                const { data: inserted, error } = await supabaseClient.from(tbl).insert(payload).select().single();
+                if (error) {
+                    console.error(`Supabase add error on ${col}:`, error);
+                    throw error;
+                }
+                return { id: inserted ? inserted.id : id };
+            },
+            async get() {
+                const { data, error } = await supabaseClient.from(tbl).select('*');
+                if (error) {
+                    console.error(`Supabase get error on ${col}:`, error);
+                    throw error;
+                }
+                const rows = data || [];
+                return {
+                    docs: rows.map(r => ({
+                        id: r.id,
+                        ref: { id: r.id, col },
+                        data: () => col === 'settings' ? (r.data || {}) : r
+                    })),
+                    empty: rows.length === 0,
+                    size: rows.length,
+                    forEach(cb) {
+                        rows.forEach(r => {
+                            cb({
+                                id: r.id,
+                                ref: { id: r.id, col },
+                                data: () => col === 'settings' ? (r.data || {}) : r
+                            });
+                        });
+                    }
+                };
+            },
+            onSnapshot(callback, errorCallback) {
+                supabaseClient.from(tbl).select('*')
+                    .then(({ data, error }) => {
+                        if (error) {
+                            if (errorCallback) errorCallback(error);
+                            return;
+                        }
+                        const rows = data || [];
+                        callback({
+                            docs: rows.map(r => ({
+                                id: r.id,
+                                data: () => col === 'settings' ? (r.data || {}) : r
+                            })),
+                            empty: rows.length === 0,
+                            size: rows.length,
+                            forEach(cb) {
+                                rows.forEach(r => {
+                                    cb({
+                                        id: r.id,
+                                        data: () => col === 'settings' ? (r.data || {}) : r
+                                    });
+                                });
+                            }
+                        });
+                    })
+                    .catch(err => {
+                        if (errorCallback) errorCallback(err);
+                    });
+
+                const chName = `ch_col_${col}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+                const ch = supabaseClient.channel(chName)
+                    .on('postgres_changes', { event: '*', schema: 'public', table: tbl }, async () => {
+                        const { data } = await supabaseClient.from(tbl).select('*');
+                        if (data) {
+                            callback({
+                                docs: data.map(r => ({
+                                    id: r.id,
+                                    data: () => col === 'settings' ? (r.data || {}) : r
+                                })),
+                                empty: data.length === 0,
+                                size: data.length,
+                                forEach(cb) {
+                                    data.forEach(r => {
+                                        cb({
+                                            id: r.id,
+                                            data: () => col === 'settings' ? (r.data || {}) : r
+                                        });
+                                    });
+                                }
+                            });
+                        }
+                    })
+                    .subscribe();
+
+                return () => {
+                    supabaseClient.removeChannel(ch);
+                };
+            }
+        };
+    }
+
+    return {
+        collection,
+        batch() {
+            const operations = [];
+            return {
+                set(docRef, data) {
+                    operations.push({ type: 'set', col: docRef.col, id: docRef.id, data });
+                },
+                update(docRef, data) {
+                    operations.push({ type: 'update', col: docRef.col, id: docRef.id, data });
+                },
+                delete(docRef) {
+                    operations.push({ type: 'delete', col: docRef.col, id: docRef.id });
+                },
+                async commit() {
+                    for (const op of operations) {
+                        const tbl = getTableName(op.col);
+                        if (op.type === 'delete') {
+                            await supabaseClient.from(tbl).delete().eq('id', op.id);
+                        } else if (op.type === 'set') {
+                            const payload = sanitizeForPostgres(tbl, { id: op.id, ...op.data });
+                            await supabaseClient.from(tbl).upsert(payload);
+                        } else if (op.type === 'update') {
+                            const payload = sanitizeForPostgres(tbl, op.data);
+                            await supabaseClient.from(tbl).update(payload).eq('id', op.id);
+                        }
+                    }
+                }
+            };
+        }
+    };
+}
+
+// Start continuous Supabase sync across collections
+function startSupabaseSync() {
+    activeCloudListeners.forEach(unsub => {
+        if (typeof unsub === 'function') unsub();
+    });
+    activeCloudListeners = [];
+
+    // Ensure main app container is displayed and login screen hidden
+    const loginScreen = document.getElementById("login-screen");
+    if (loginScreen) loginScreen.style.display = "none";
+    const appContainer = document.querySelector(".app-container");
+    if (appContainer) appContainer.style.display = "flex";
+
+    // 1. Listen to settings collection to synchronize configurations
+    const settingsUnsub = db.collection("settings").doc("app").onSnapshot(doc => {
+        if (doc && doc.exists) {
+            const data = doc.data();
+            if (data.master_admin_email !== undefined) {
+                STATE.masterAdminEmail = data.master_admin_email;
+            }
+            STATE.masterAdminEmailLoaded = true;
+
+            if (data.foyer_logo_url !== undefined) {
+                localStorage.setItem("foyer_logo_url", data.foyer_logo_url);
+            }
+            if (data.foyer_logo_opacity !== undefined) {
+                localStorage.setItem("foyer_logo_opacity", data.foyer_logo_opacity);
+            }
+            if (data.foyer_cotisation_amount !== undefined) {
+                localStorage.setItem("foyer_cotisation_amount", data.foyer_cotisation_amount);
+            }
+
+            const logoUrl = localStorage.getItem("foyer_logo_url") || "logo.png?v=8.3";
+            const opacity = localStorage.getItem("foyer_logo_opacity") !== null ? 
+                Number(localStorage.getItem("foyer_logo_opacity")) : 0.05;
+            renderLogo(logoUrl, opacity);
+            updateLogoControls(logoUrl, opacity);
+
+            const cotInput = document.getElementById("settings-cotisation-amount");
+            if (cotInput) {
+                cotInput.value = getCotisationAmount();
+            }
+            debouncedRefreshAllViews();
+        }
+    }, err => {
+        console.warn("Settings fetch warning:", err);
+    });
+    activeCloudListeners.push(settingsUnsub);
+
+    // 2. Listen to all data collections in real time
+    const collections = [
+        'adherents', 'transactions', 'categories', 'manifestations', 
+        'investissements', 'produits', 'reservations', 'notes',
+        'feteRuraleStands', 'feteRuraleReceipts', 'feteRuraleExpenses', 'feteRuralePartners',
+        'profiles', 'evolutionNotes', 'sharedEquipments', 'partnerAssociations'
+    ];
+
+    collections.forEach(col => {
+        const unsub = db.collection(col).onSnapshot(snapshot => {
+            let items = [];
+            snapshot.forEach(doc => {
+                items.push({ id: doc.id, ...doc.data() });
+            });
+            if (col === 'feteRuraleStands' || col === 'feteRuraleReceipts' || col === 'feteRuraleExpenses' || col === 'feteRuralePartners') {
+                items.forEach(item => {
+                    if (!item.manifestation_id) item.manifestation_id = "man-fete-rurale";
+                });
+            }
+            if (col === 'categories') {
+                if (items.length === 0) {
+                    DEFAULT_CATEGORIES.forEach(dc => {
+                        db.collection("categories").doc(dc.id).set(dc).catch(() => {});
+                    });
+                }
+            }
+            STATE[col] = items;
+            if (col === 'profiles') {
+                STATE.profilesLoaded = true;
+            }
+            debouncedRefreshAllViews();
+        }, error => {
+            console.error(`Supabase listen error on ${col}:`, error);
+        });
+        activeCloudListeners.push(unsub);
+    });
+}
+
+// --- Supabase Database Mode Connection ---
+function connectSupabase() {
+    try {
+        const config = STATE.supabaseConfig || DEFAULT_SUPABASE_CONFIG;
+        if (!window.supabase) {
+            console.warn("Supabase library not loaded. Falling back to local mode.");
+            connectLocal();
+            return;
+        }
+
+        window.supabaseClient = window.supabase.createClient(config.url, config.anonKey);
+        window.db = createSupabaseDbAdapter(window.supabaseClient);
+        db = window.db;
+        dbMode = 'supabase';
+        updateDbStatusBadge();
+
+        // 100% Supabase Operation: start sync immediately without forcing prior login
+        startSupabaseSync();
+
+        // Listen to Auth State Changes to update profile/admin if signed in
+        window.supabaseClient.auth.onAuthStateChange((event, session) => {
+            window.supabaseSession = session;
+            const user = session?.user;
+            const logoutBtn = document.getElementById("btn-sidebar-logout");
+            if (user) {
+                if (logoutBtn) logoutBtn.style.display = "flex";
+                if (!STATE.masterAdminEmail && user.email) {
+                    STATE.masterAdminEmail = user.email.toLowerCase();
+                    STATE.masterAdminEmailLoaded = true;
+                }
+            } else {
+                if (logoutBtn) logoutBtn.style.display = "none";
+            }
+            debouncedRefreshAllViews();
+        });
+
+        // Trigger initial session check
+        window.supabaseClient.auth.getSession().then(({ data: { session } }) => {
+            if (session) {
+                window.supabaseSession = session;
+                const logoutBtn = document.getElementById("btn-sidebar-logout");
+                if (logoutBtn) logoutBtn.style.display = "flex";
+            }
+        });
+
+    } catch (e) {
+        console.error("Supabase init failed:", e);
+        alert("Échec de la connexion à Supabase. Utilisation du mode local.");
+        STATE.supabaseEnabled = false;
+        connectLocal();
+    }
+}
+
+// --- Firebase Cloud Storage Database Mode (Legacy Fallback) ---
 let activeFirebaseListeners = [];
 
 function connectFirebase() {
     try {
+        if (typeof firebase === 'undefined' || !firebase.apps) {
+            connectLocal();
+            return;
+        }
         if (!firebase.apps.length) {
             if (STATE.firebaseConfig) {
                 firebase.initializeApp(STATE.firebaseConfig);
             } else {
                 firebase.initializeApp();
             }
-            // Enable offline persistence for robust mobile support
-            firebase.firestore().enablePersistence({ synchronizeTabs: true })
-                .catch(err => {
-                    if (err.code == 'failed-precondition') {
-                        console.warn("Persistence failed: multiple tabs open");
-                    } else if (err.code == 'unimplemented') {
-                        console.warn("Persistence not supported by browser");
-                    }
-                });
         }
         db = firebase.firestore();
         dbMode = 'firebase';
         updateDbStatusBadge();
         
-        // Listen to Auth State Changes
         firebase.auth().onAuthStateChanged(user => {
-            // Unsubscribe all active listeners before creating new ones
             activeFirebaseListeners.forEach(unsub => unsub());
             activeFirebaseListeners = [];
             
             if (user) {
-                // User is signed in
                 document.getElementById("login-screen").style.display = "none";
                 const logoutBtn = document.getElementById("btn-sidebar-logout");
                 if (logoutBtn) logoutBtn.style.display = "flex";
@@ -313,48 +801,18 @@ function connectFirebase() {
                 const appContainer = document.querySelector(".app-container");
                 if (appContainer) appContainer.style.display = "flex";
                 
-                // 1. Listen to settings collection to synchronize configurations
                 const settingsUnsub = db.collection("settings").doc("app").onSnapshot(doc => {
                     if (doc.exists) {
                         const data = doc.data();
                         if (data.master_admin_email !== undefined) {
                             STATE.masterAdminEmail = data.master_admin_email;
-                        } else if (user && user.email) {
-                            STATE.masterAdminEmail = user.email.toLowerCase();
-                            db.collection("settings").doc("app").set({ master_admin_email: user.email.toLowerCase() }, { merge: true })
-                                .catch(e => console.error("Error setting master_admin_email:", e));
                         }
                         STATE.masterAdminEmailLoaded = true;
                         refreshAllViews();
-                        
-                        if (data.foyer_logo_url !== undefined) {
-                            localStorage.setItem("foyer_logo_url", data.foyer_logo_url);
-                        }
-                        if (data.foyer_logo_opacity !== undefined) {
-                            localStorage.setItem("foyer_logo_opacity", data.foyer_logo_opacity);
-                        }
-                        if (data.foyer_cotisation_amount !== undefined) {
-                            localStorage.setItem("foyer_cotisation_amount", data.foyer_cotisation_amount);
-                        }
-                        
-                        // Refresh logo in UI
-                        const logoUrl = localStorage.getItem("foyer_logo_url") || "logo.png?v=2.2";
-                        const opacity = localStorage.getItem("foyer_logo_opacity") !== null ? 
-                            Number(localStorage.getItem("foyer_logo_opacity")) : 0.05;
-                        renderLogo(logoUrl, opacity);
-                        updateLogoControls(logoUrl, opacity);
-                        
-                        const cotInput = document.getElementById("settings-cotisation-amount");
-                        if (cotInput) {
-                            cotInput.value = getCotisationAmount();
-                        }
                     }
-                }, err => {
-                    console.warn("Settings fetch failed (likely initial setup):", err);
                 });
                 activeFirebaseListeners.push(settingsUnsub);
                 
-                // 2. Listen to data collections in real time
                 const collections = [
                     'adherents', 'transactions', 'categories', 'manifestations', 
                     'investissements', 'produits', 'reservations', 'notes',
@@ -368,55 +826,27 @@ function connectFirebase() {
                         snapshot.forEach(doc => {
                             items.push({ id: doc.id, ...doc.data() });
                         });
-                        if (col === 'feteRuraleStands' || col === 'feteRuraleReceipts' || col === 'feteRuraleExpenses' || col === 'feteRuralePartners') {
-                            items.forEach(item => {
-                                if (!item.manifestation_id) item.manifestation_id = "man-fete-rurale";
-                            });
-                        }
-                        if (col === 'categories') {
-                            if (items.length === 0) {
-                                DEFAULT_CATEGORIES.forEach(dc => {
-                                    db.collection("categories").doc(dc.id).set(dc).catch(() => {});
-                                });
-                            }
-                        }
                         STATE[col] = items;
-                        if (col === 'profiles') {
-                            STATE.profilesLoaded = true;
-                        }
                         debouncedRefreshAllViews();
-                    }, error => {
-                        console.error(`Firebase listen error on ${col}:`, error);
                     });
                     activeFirebaseListeners.push(unsub);
                 });
-                
             } else {
-                // User is signed out: display login, hide main app
                 document.getElementById("login-screen").style.display = "flex";
                 const logoutBtn = document.getElementById("btn-sidebar-logout");
                 if (logoutBtn) logoutBtn.style.display = "none";
-                
                 const appContainer = document.querySelector(".app-container");
                 if (appContainer) appContainer.style.display = "none";
-                
-                const logoUrl = localStorage.getItem("foyer_logo_url") || "logo.png?v=2.2";
-                const loginLogoImg = document.getElementById("login-logo-img");
-                if (loginLogoImg) loginLogoImg.src = logoUrl;
             }
         });
         
     } catch (e) {
         console.error("Firebase init failed:", e);
-        alert("Échec de la connexion à Firebase. Assurez-vous que la configuration est correcte. Utilisation du mode local.");
-        STATE.firebaseEnabled = false;
-        localStorage.setItem("foyer_firebase_enabled", "false");
-        document.getElementById("fb-enabled").checked = false;
         connectLocal();
     }
 }
 
-function handleLoginSubmit(e) {
+async function handleLoginSubmit(e) {
     e.preventDefault();
     const email = document.getElementById("login-email").value.trim();
     const password = document.getElementById("login-password").value;
@@ -429,42 +859,64 @@ function handleLoginSubmit(e) {
         submitBtn.innerText = "Connexion en cours...";
     }
     
-    firebase.auth().signInWithEmailAndPassword(email, password)
-        .then(() => {
+    try {
+        if (window.supabaseClient) {
+            let { data, error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) {
+                // If sign in fails, auto create account with autoconfirm
+                const { data: signUpData, error: signUpErr } = await window.supabaseClient.auth.signUp({
+                    email,
+                    password
+                });
+                if (signUpErr) {
+                    throw error;
+                }
+                data = signUpData;
+            }
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.innerText = "Se connecter";
             }
             document.getElementById("login-form").reset();
-        })
-        .catch(err => {
-            console.error("Sign in failed:", err);
+        } else if (window.firebase && typeof firebase.auth === 'function') {
+            await firebase.auth().signInWithEmailAndPassword(email, password);
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.innerText = "Se connecter";
             }
-            if (errorMsg) {
-                errorMsg.innerText = "Identifiants incorrects : " + err.message;
-                errorMsg.style.display = "block";
-            }
-        });
+            document.getElementById("login-form").reset();
+        }
+    } catch (err) {
+        console.error("Sign in failed:", err);
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerText = "Se connecter";
+        }
+        if (errorMsg) {
+            errorMsg.innerText = "Identifiants incorrects : " + (err.message || err);
+            errorMsg.style.display = "block";
+        }
+    }
 }
 
-function logoutUser() {
+async function logoutUser() {
     if (confirm("Voulez-vous vraiment vous déconnecter ?")) {
-        firebase.auth().signOut()
-            .then(() => {
-                activeFirebaseListeners.forEach(unsub => unsub());
-                activeFirebaseListeners = [];
-                // Reset mode to local to allow browsing offline if needed
-                const isFirebaseHosted = window.location.hostname.endsWith(".web.app") || 
-                                         window.location.hostname.endsWith(".firebaseapp.com");
-                if (!isFirebaseHosted) {
-                    dbMode = 'local';
-                    updateDbStatusBadge();
-                }
-            })
-            .catch(err => alert("Erreur lors de la déconnexion : " + err.message));
+        try {
+            if (window.supabaseClient) {
+                await window.supabaseClient.auth.signOut();
+                window.supabaseSession = null;
+                STATE.currentUserProfile = null;
+                const logoutBtn = document.getElementById("btn-sidebar-logout");
+                if (logoutBtn) logoutBtn.style.display = "none";
+                refreshAllViews();
+            } else if (window.firebase && typeof firebase.auth === 'function') {
+                await firebase.auth().signOut();
+                dbMode = 'local';
+                updateDbStatusBadge();
+            }
+        } catch (err) {
+            alert("Erreur lors de la déconnexion : " + err.message);
+        }
     }
 }
 
@@ -576,8 +1028,10 @@ function seedDemoData() {
 }
 
 function saveState() {
-    if (dbMode === 'local') {
+    try {
         localStorage.setItem("foyer_rural_db", JSON.stringify(STATE));
+    } catch (e) {
+        console.warn("LocalStorage saveState warning:", e);
     }
 }
 
@@ -592,8 +1046,9 @@ function debouncedRefreshAllViews() {
 
 function refreshAllViews() {
     // Resolve current user profile
-    if (dbMode === 'firebase' && firebase.auth().currentUser) {
-        const userEmail = firebase.auth().currentUser.email.toLowerCase();
+    const curUser = getCurrentUser();
+    if (isCloudDb() && curUser && curUser.email) {
+        const userEmail = curUser.email.toLowerCase();
         
         // Wait until both profiles AND masterAdminEmail are loaded before deciding
         if (!STATE.masterAdminEmailLoaded || !STATE.profilesLoaded) {
@@ -607,7 +1062,7 @@ function refreshAllViews() {
             } else {
                 // Profile doc is not found but both lists are loaded: user was deleted/revoked!
                 alert("Ce profil utilisateur a été supprimé ou n'est plus configuré. Accès révoqué.");
-                firebase.auth().signOut();
+                logoutUser();
                 return;
             }
         }
@@ -668,22 +1123,23 @@ function updateDbStatusBadge() {
     const dot = document.getElementById("db-status-dot");
     const text = document.getElementById("db-status-text");
     const desc = document.getElementById("db-status-desc");
-    const btnSync = document.getElementById("btn-sync-local-to-fb");
+    const btnSync = document.getElementById("btn-sync-local-to-sb") || document.getElementById("btn-sync-local-to-fb");
     
-    if (dbMode === 'firebase') {
-        dot.className = "status-dot online";
-        text.innerText = "Mode Firebase";
-        desc.innerText = "Synchronisé en temps réel";
-        btnSync.style.display = "none";
+    if (dbMode === 'supabase') {
+        if (dot) dot.className = "status-dot online";
+        if (text) text.innerText = "Mode Supabase Cloud";
+        if (desc) desc.innerText = "PostgreSQL 17 en temps réel";
+        if (btnSync) btnSync.style.display = "inline-flex";
+    } else if (isCloudDb()) {
+        if (dot) dot.className = "status-dot online";
+        if (text) text.innerText = "Mode Firebase";
+        if (desc) desc.innerText = "Synchronisé en temps réel";
+        if (btnSync) btnSync.style.display = "none";
     } else {
-        dot.className = "status-dot";
-        text.innerText = "Mode Local";
-        desc.innerText = "Données stockées sur ce PC";
-        if (STATE.firebaseConfig) {
-            btnSync.style.display = "inline-flex";
-        } else {
-            btnSync.style.display = "none";
-        }
+        if (dot) dot.className = "status-dot";
+        if (text) text.innerText = "Mode Local";
+        if (desc) desc.innerText = "Données stockées sur ce PC";
+        if (btnSync) btnSync.style.display = "inline-flex";
     }
 }
 
@@ -1200,14 +1656,33 @@ function saveAdherent(e) {
 
     const data = { numero_adherent, nom, prenom, email, date_adhesion, cotisation_a_jour, gestanet_periods };
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         if (id) {
             db.collection("adherents").doc(id).update(data)
                 .then(() => closeModal("modal-adherent"))
                 .catch(err => alert("Erreur d'enregistrement: " + err));
         } else {
             db.collection("adherents").add(data)
-                .then(() => closeModal("modal-adherent"))
+                .then(docRef => {
+                    if (cotisation_a_jour) {
+                        db.collection("transactions").add({
+                            date_transaction: date_adhesion || new Date().toISOString().split('T')[0],
+                            description: `Cotisation annuelle ${prenom} ${nom}`,
+                            type_flux: "Recette",
+                            montant: getCotisationAmount(),
+                            quantite: 1,
+                            prix: getCotisationAmount(),
+                            paye: true,
+                            moyen_payement: "Espèces",
+                            categorie_id: "cat-1",
+                            adherent_id: docRef.id,
+                            manifestation_id: null,
+                            investissement_id: null,
+                            produit_id: null
+                        }).catch(e => console.error("Error logging cotisation transaction:", e));
+                    }
+                    closeModal("modal-adherent");
+                })
                 .catch(err => alert("Erreur d'enregistrement: " + err));
         }
     } else {
@@ -1269,7 +1744,7 @@ function deleteAdherent(id) {
     }
     if (!confirm("Voulez-vous vraiment supprimer cet adhérent ? Cela supprimera également ses réservations de court.")) return;
     
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         // Delete reservations linked
         STATE.reservations.filter(r => r.adherent_id === id).forEach(r => {
             db.collection("reservations").doc(r.id).delete();
@@ -1295,7 +1770,7 @@ function toggleAdherentCotisation(id) {
     const wasUpToDate = isAdherentCotisationUpToDate(a);
     const newVal = !wasUpToDate;
     
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection("adherents").doc(id).update({ cotisation_a_jour: newVal });
         if (newVal) {
             const todayStr = formatDate(new Date());
@@ -1381,7 +1856,7 @@ function toggleAdherentGestanet(id) {
         newPeriods.push(STATE.currentPeriod);
     }
     
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection("adherents").doc(id).update({ gestanet_periods: newPeriods })
             .then(() => refreshAllViews())
             .catch(err => alert("Erreur d'enregistrement Gestanet: " + err));
@@ -1495,7 +1970,7 @@ function saveTennisBooking(e) {
 
     const data = { date, hour, adherent_id };
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection("reservations").add(data)
             .then(() => closeModal("modal-tennis"))
             .catch(err => alert("Erreur: " + err));
@@ -1515,7 +1990,7 @@ function deleteTennisBooking(id) {
     }
     if (!confirm("Voulez-vous vraiment supprimer cette réservation ?")) return;
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection("reservations").doc(id).delete()
             .catch(err => alert("Erreur: " + err));
     } else {
@@ -1810,7 +2285,7 @@ function saveTransaction(e) {
         num_cheque, cheque_encaisse
     };
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         if (id) {
             db.collection("transactions").doc(id).update(data)
                 .then(() => {
@@ -1859,7 +2334,7 @@ function adjustStockIfProductLinked(prodId, qte, typeFlux, txId) {
         newStock += Number(qte);
     }
     
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection("produits").doc(prodId).update({ quantite_stock: newStock });
     } else {
         p.quantite_stock = newStock;
@@ -1936,12 +2411,12 @@ function toggleChequeEncaisse(txId, event) {
     const exp = (STATE.feteRuraleExpenses || []).find(e => e.transaction_id === txId);
     if (exp) {
         exp.cheque_encaisse = tx.cheque_encaisse;
-        if (dbMode === 'firebase') {
+        if (isCloudDb()) {
             saveFeteData("feteRuraleExpenses", exp);
         }
     }
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection("transactions").doc(tx.id).update({
             cheque_encaisse: tx.cheque_encaisse
         }).then(() => refreshAllViews()).catch(err => alert("Erreur d'enregistrement: " + err));
@@ -1966,13 +2441,13 @@ function toggleFeteExpenseChequeEncaisse(expId, event) {
         const tx = STATE.transactions.find(t => t.id === exp.transaction_id);
         if (tx) {
             tx.cheque_encaisse = exp.cheque_encaisse;
-            if (dbMode === 'firebase') {
+            if (isCloudDb()) {
                 db.collection("transactions").doc(tx.id).update({ cheque_encaisse: tx.cheque_encaisse });
             }
         }
     }
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         saveFeteData("feteRuraleExpenses", exp, () => refreshAllViews());
     } else {
         saveState();
@@ -1987,7 +2462,7 @@ function deleteTransaction(id) {
     }
     if (!confirm("Voulez-vous vraiment supprimer cette transaction ?")) return;
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection("transactions").doc(id).delete()
             .catch(err => alert("Erreur de suppression: " + err));
     } else {
@@ -2007,7 +2482,7 @@ function toggleTransactionPaid(id) {
     
     const newVal = !t.paye;
     
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection("transactions").doc(id).update({ paye: newVal });
     } else {
         t.paye = newVal;
@@ -2513,7 +2988,7 @@ function saveManifestation(e) {
 
     const data = { nom, date_debut, date_fin, lieu };
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         if (id) {
             db.collection("manifestations").doc(id).update(data)
                 .then(() => closeModal("modal-manifestation"))
@@ -2558,7 +3033,7 @@ function deleteManifestation(id) {
     }
     if (!confirm("Voulez-vous vraiment supprimer cet événement ?")) return;
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection("manifestations").doc(id).delete()
             .catch(err => alert("Erreur: " + err));
     } else {
@@ -2663,7 +3138,7 @@ function saveProduit(e) {
 
     const data = { nom_boisson, prix, quantite_stock, seuil_alerte };
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         if (id) {
             db.collection("produits").doc(id).update(data)
                 .then(() => closeModal("modal-produit"))
@@ -2708,7 +3183,7 @@ function deleteProduit(id) {
     }
     if (!confirm("Voulez-vous vraiment supprimer ce produit de la réserve ?")) return;
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection("produits").doc(id).delete()
             .catch(err => alert("Erreur de suppression: " + err));
     } else {
@@ -2813,7 +3288,7 @@ function saveInventoryAdjustments(e) {
     }
 
     // Save actual inventories and log correction transactions
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         adjustmentsMade.forEach(adj => {
             // Update stock
             db.collection("produits").doc(adj.prodId).update({ quantite_stock: adj.newQty });
@@ -2975,7 +3450,7 @@ function saveInvestissement(e) {
 
     const data = { libelle, date_acquisition, montant_achat, duree_amortissement_ans, etat, moyen_payement: moyen, num_cheque, cheque_encaisse };
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         if (id) {
             db.collection("investissements").doc(id).update(data)
                 .then(() => closeModal("modal-investissement"))
@@ -3065,7 +3540,7 @@ function deleteInvestissement(id) {
     }
     if (!confirm("Voulez-vous vraiment supprimer cet investissement ?")) return;
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection("investissements").doc(id).delete()
             .catch(err => alert("Erreur: " + err));
     } else {
@@ -3207,7 +3682,7 @@ function saveNote() {
 
     const data = { titre, date_reunion, contenu, manifestation_id };
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         if (id) {
             db.collection("notes").doc(id).update(data)
                 .then(() => {
@@ -3246,7 +3721,7 @@ function deleteNote(id) {
     }
     if (!confirm("Voulez-vous vraiment supprimer cette note ?")) return;
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection("notes").doc(id).delete()
             .then(() => {
                 selectedNoteId = null;
@@ -3347,7 +3822,7 @@ function saveInvoiceEmitterSettings(e) {
     STATE.emitterInfo = info;
     localStorage.setItem("foyer_emitter_info", JSON.stringify(info));
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection("settings").doc("emitter").set(info)
             .then(() => alert("Coordonnées de l'émetteur enregistrées avec succès !"))
             .catch(err => alert("Erreur d'enregistrement : " + err.message));
@@ -3565,7 +4040,7 @@ function saveInvoiceEdits() {
         };
         STATE.emitterInfo = info;
         localStorage.setItem("foyer_emitter_info", JSON.stringify(info));
-        if (dbMode === 'firebase') {
+        if (isCloudDb()) {
             db.collection("settings").doc("emitter").set(info).catch(err => console.error(err));
         }
     }
@@ -3585,7 +4060,7 @@ function saveInvoiceEdits() {
             a.email = email;
             if (dateAdh) a.date_adhesion = dateAdh;
             
-            if (dbMode === 'firebase') {
+            if (isCloudDb()) {
                 db.collection("adherents").doc(a.id).set(a).catch(err => console.error(err));
             }
         }
@@ -3601,7 +4076,7 @@ function saveInvoiceEdits() {
         currentInvoiceTx.paye = isPaid;
         STATE.transactions.push(currentInvoiceTx);
         
-        if (dbMode === 'firebase') {
+        if (isCloudDb()) {
             db.collection("transactions").doc(currentInvoiceTx.id).set(currentInvoiceTx).catch(err => console.error(err));
         }
     } else {
@@ -3613,7 +4088,7 @@ function saveInvoiceEdits() {
             tx.montant = total;
             tx.paye = isPaid;
             
-            if (dbMode === 'firebase') {
+            if (isCloudDb()) {
                 db.collection("transactions").doc(tx.id).set(tx).catch(err => console.error(err));
             }
         }
@@ -3745,7 +4220,7 @@ function importDatabase(event) {
         try {
             const imported = JSON.parse(e.target.result);
             if (imported.adherents && imported.transactions && imported.produits) {
-                if (dbMode === 'firebase') {
+                if (isCloudDb()) {
                     // Perform sequential cloud sets
                     alert("Importation vers Firebase initiée. Les collections locales vont écraser Cloud Firestore.");
                     performFullFirebaseImport(imported);
@@ -3767,12 +4242,100 @@ function importDatabase(event) {
 
 function resetDatabaseWithDemo() {
     if (confirm("Voulez-vous réinitialiser toute la base de données avec les données de démonstration ? Cela écrasera vos modifications actuelles.")) {
-        if (dbMode === 'firebase') {
+        if (isCloudDb()) {
             performFullFirebaseImport(null); // Seeds cloud
         } else {
             seedDemoData();
             alert("Données de démonstration chargées.");
         }
+    }
+}
+
+function saveSupabaseConfig(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const url = (document.getElementById("sb-url") ? document.getElementById("sb-url").value.trim() : "") || DEFAULT_SUPABASE_CONFIG.url;
+    const anonKey = (document.getElementById("sb-anonKey") ? document.getElementById("sb-anonKey").value.trim() : "") || DEFAULT_SUPABASE_CONFIG.anonKey;
+    const projectRef = (document.getElementById("sb-projectRef") ? document.getElementById("sb-projectRef").value.trim() : "") || DEFAULT_SUPABASE_CONFIG.projectRef;
+    const enabled = document.getElementById("sb-enabled") ? document.getElementById("sb-enabled").checked : true;
+    
+    const config = { url, anonKey, projectRef };
+    localStorage.setItem("foyer_supabase_config", JSON.stringify(config));
+    localStorage.setItem("foyer_supabase_enabled", enabled ? "true" : "false");
+    
+    STATE.supabaseConfig = config;
+    STATE.supabaseEnabled = enabled;
+
+    alert("Configuration Supabase enregistrée !");
+    
+    if (enabled) {
+        connectSupabase();
+    } else {
+        connectLocal();
+    }
+}
+
+async function migrateLocalToSupabase() {
+    if (!window.supabaseClient) {
+        alert("Veuillez d'abord activer et connecter Supabase.");
+        return;
+    }
+    
+    if (!confirm("Voulez-vous synchroniser et envoyer toutes vos données locales vers Supabase Cloud ?")) {
+        return;
+    }
+    
+    try {
+        const collections = [
+            'categories', 'manifestations', 'adherents', 'produits', 'investissements',
+            'sharedEquipments', 'partnerAssociations', 'transactions', 'reservations',
+            'notes', 'feteRuraleStands', 'feteRuraleReceipts', 'feteRuraleExpenses',
+            'feteRuralePartners', 'profiles', 'evolutionNotes'
+        ];
+        
+        let totalSynced = 0;
+        for (const col of collections) {
+            const tbl = getTableName(col);
+            const items = STATE[col] || [];
+            if (items.length > 0) {
+                for (const item of items) {
+                    const payload = { ...item };
+                    await window.supabaseClient.from(tbl).upsert(payload);
+                    totalSynced++;
+                }
+            }
+        }
+        alert(`Synchronisation vers Supabase réussie ! ${totalSynced} éléments synchronisés.`);
+        refreshAllViews();
+    } catch (err) {
+        console.error("Migration error:", err);
+        alert("Erreur lors de la synchronisation vers Supabase : " + err.message);
+    }
+}
+
+async function syncFromSupabase() {
+    if (!window.supabaseClient) {
+        alert("Supabase n'est pas initialisé.");
+        return;
+    }
+    try {
+        const collections = [
+            'categories', 'manifestations', 'adherents', 'produits', 'investissements',
+            'sharedEquipments', 'partnerAssociations', 'transactions', 'reservations',
+            'notes', 'feteRuraleStands', 'feteRuraleReceipts', 'feteRuraleExpenses',
+            'feteRuralePartners', 'profiles', 'evolutionNotes'
+        ];
+        
+        for (const col of collections) {
+            const tbl = getTableName(col);
+            const { data, error } = await window.supabaseClient.from(tbl).select('*');
+            if (!error && data) {
+                STATE[col] = data;
+            }
+        }
+        alert("Données rechargées avec succès depuis Supabase !");
+        refreshAllViews();
+    } catch (err) {
+        alert("Erreur de rechargement : " + err.message);
     }
 }
 
@@ -3803,7 +4366,7 @@ function saveFirebaseConfig(e) {
 
 // Push local browser data to cloud database
 function migrateLocalToFirebase() {
-    if (!STATE.firebaseConfig || dbMode !== 'firebase') {
+    if (!STATE.firebaseConfig || !isCloudDb()) {
         alert("Veuillez d'abord configurer et activer la synchronisation Firebase.");
         return;
     }
@@ -4246,7 +4809,7 @@ function cancelCategoryEdit() {
 
 function saveCategory(e) {
     e.preventDefault();
-    if (dbMode === 'firebase' && STATE.currentUserProfile) {
+    if (isCloudDb() && STATE.currentUserProfile) {
         alert("Action réservée à l'administrateur maître.");
         return;
     }
@@ -4258,7 +4821,7 @@ function saveCategory(e) {
     
     const data = { libelle, type };
     
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         if (id) {
             db.collection("categories").doc(id).update(data)
                 .then(() => {
@@ -4287,7 +4850,7 @@ function saveCategory(e) {
 }
 
 function deleteCategory(id) {
-    if (dbMode === 'firebase' && STATE.currentUserProfile) {
+    if (isCloudDb() && STATE.currentUserProfile) {
         alert("Action réservée à l'administrateur maître.");
         return;
     }
@@ -4298,7 +4861,7 @@ function deleteCategory(id) {
         }
     }
     
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         // Dissociate transactions first in Cloud
         STATE.transactions.filter(t => t.categorie_id === id).forEach(t => {
             db.collection("transactions").doc(t.id).update({ categorie_id: "" });
@@ -4322,7 +4885,7 @@ function deleteCategory(id) {
 
 // Helper to save data either locally or on Firebase
 function saveFeteData(collectionName, item, callback) {
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         const id = item.id;
         db.collection(collectionName).doc(id).set(item)
             .then(() => {
@@ -4346,7 +4909,7 @@ function saveFeteData(collectionName, item, callback) {
 
 // Helper to delete data either locally or on Firebase
 function deleteFeteData(collectionName, id, callback) {
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection(collectionName).doc(id).delete()
             .then(() => {
                 if (callback) callback();
@@ -4385,7 +4948,7 @@ function syncFeteFinancialToTransactions(txId, txData, callback) {
             produit_id: ""
         };
 
-        if (dbMode === 'firebase') {
+        if (isCloudDb()) {
             db.collection("transactions").doc(newTxId).set(txObj)
                 .then(() => {
                     if (callback) callback(newTxId);
@@ -4398,7 +4961,7 @@ function syncFeteFinancialToTransactions(txId, txData, callback) {
         }
     } else {
         // Update existing transaction
-        if (dbMode === 'firebase') {
+        if (isCloudDb()) {
             db.collection("transactions").doc(txId).get()
                 .then(doc => {
                     if (doc.exists) {
@@ -4455,7 +5018,7 @@ function deleteFeteFinancialTransaction(txId, callback) {
         if (callback) callback();
         return;
     }
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection("transactions").doc(txId).delete()
             .then(() => {
                 if (callback) callback();
@@ -4479,7 +5042,7 @@ function handleFeteFile(event, hiddenInputId) {
         return;
     }
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         const fileInput = event.target;
         const fileInputLabel = fileInput.nextElementSibling;
         const originalText = fileInputLabel ? fileInputLabel.innerText : "";
@@ -4487,24 +5050,20 @@ function handleFeteFile(event, hiddenInputId) {
             fileInputLabel.innerText = "Téléchargement en cours...";
         }
         
-        const storageRef = firebase.storage().ref();
-        const fileRef = storageRef.child(`uploads/${Date.now()}_${file.name}`);
-        
-        fileRef.put(file).then(snapshot => {
-            return snapshot.ref.getDownloadURL();
-        }).then(url => {
-            document.getElementById(hiddenInputId).value = url;
-            if (fileInputLabel) {
-                fileInputLabel.innerText = "Fichier prêt !";
-            }
-        }).catch(err => {
-            console.error("Storage upload failed:", err);
-            alert("Échec du téléchargement de l'image sur Firebase Storage : " + err.message);
-            if (fileInputLabel) {
-                fileInputLabel.innerText = originalText || "Choisir un fichier";
-            }
-            fileInput.value = "";
-        });
+        uploadFileToStorage(file, 'uploads')
+            .then(url => {
+                document.getElementById(hiddenInputId).value = url;
+                if (fileInputLabel) {
+                    fileInputLabel.innerText = "Fichier prêt !";
+                }
+            }).catch(err => {
+                console.error("Storage upload failed:", err);
+                alert("Échec du téléchargement du fichier : " + err.message);
+                if (fileInputLabel) {
+                    fileInputLabel.innerText = originalText || "Choisir un fichier";
+                }
+                fileInput.value = "";
+            });
     } else {
         const reader = new FileReader();
         reader.onload = function(e) {
@@ -5747,28 +6306,25 @@ function updateLogoControls(logoUrl, opacity) {
 }
 
 function handleLogoUpload(e) {
-    if (dbMode === 'firebase' && STATE.currentUserProfile) {
+    if (isCloudDb() && STATE.currentUserProfile) {
         alert("Action réservée à l'administrateur maître.");
         return;
     }
     const file = e.target.files[0];
     if (!file) return;
     
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         const fileName = document.getElementById("logo-file-name");
         if (fileName) fileName.innerText = "Téléversement...";
         
-        const storageRef = firebase.storage().ref();
-        const fileRef = storageRef.child(`logo/${Date.now()}_${file.name}`);
-        fileRef.put(file).then(snapshot => {
-            return snapshot.ref.getDownloadURL();
-        }).then(url => {
-            return db.collection("settings").doc("app").set({ foyer_logo_url: url }, { merge: true });
-        }).catch(err => {
-            console.error("Logo upload failed:", err);
-            alert("Échec du téléversement du logo : " + err.message);
-            initLogo();
-        });
+        uploadFileToStorage(file, 'logo')
+            .then(url => {
+                return db.collection("settings").doc("app").set({ foyer_logo_url: url }, { merge: true });
+            }).catch(err => {
+                console.error("Logo upload failed:", err);
+                alert("Échec du téléversement du logo : " + err.message);
+                initLogo();
+            });
     } else {
         const reader = new FileReader();
         reader.onload = function(evt) {
@@ -5786,7 +6342,7 @@ function handleLogoUpload(e) {
 }
 
 function updateLogoOpacityFromRange(val) {
-    if (dbMode === 'firebase' && STATE.currentUserProfile) {
+    if (isCloudDb() && STATE.currentUserProfile) {
         alert("Action réservée à l'administrateur maître.");
         return;
     }
@@ -5799,24 +6355,24 @@ function updateLogoOpacityFromRange(val) {
     const opacityValue = document.getElementById("logo-opacity-value");
     if (opacityValue) opacityValue.innerText = val + "%";
     
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection("settings").doc("app").set({ foyer_logo_opacity: opacity }, { merge: true })
             .catch(err => console.error("Failed to sync logo opacity:", err));
     }
 }
 
 function resetLogoSettings() {
-    if (dbMode === 'firebase' && STATE.currentUserProfile) {
+    if (isCloudDb() && STATE.currentUserProfile) {
         alert("Action réservée à l'administrateur maître.");
         return;
     }
     localStorage.removeItem("foyer_logo_url");
     localStorage.removeItem("foyer_logo_opacity");
     
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection("settings").doc("app").set({ 
-            foyer_logo_url: firebase.firestore.FieldValue.delete(), 
-            foyer_logo_opacity: firebase.firestore.FieldValue.delete() 
+            foyer_logo_url: "", 
+            foyer_logo_opacity: 0.05 
         }, { merge: true })
         .then(() => initLogo())
         .catch(err => {
@@ -5835,20 +6391,20 @@ function getCotisationAmount() {
 }
 
 function saveCotisationAmountSetting(val) {
-    if (dbMode === 'firebase' && STATE.currentUserProfile) {
+    if (isCloudDb() && STATE.currentUserProfile) {
         alert("Action réservée à l'administrateur maître.");
         return;
     }
     const amount = Number(val) || 20.00;
     localStorage.setItem("foyer_cotisation_amount", amount);
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection("settings").doc("app").set({ foyer_cotisation_amount: amount }, { merge: true })
             .catch(err => console.error("Failed to sync cotisation amount:", err));
     }
 }
 
 function hasWritePermission(tabId) {
-    if (dbMode !== 'firebase') return true;
+    if (!isCloudDb()) return true;
     const profile = STATE.currentUserProfile;
     if (!profile) return true; // Master admin has full access
     const perm = getPermForTab(profile, tabId);
@@ -5892,7 +6448,7 @@ function applyPermissionsToUI() {
     if (profileNameSpan) {
         if (profile && profile.name) {
             profileNameSpan.innerText = profile.name + " — ";
-        } else if (dbMode === 'firebase' && firebase.auth().currentUser) {
+        } else if (isCloudDb() && getCurrentUser()) {
             profileNameSpan.innerText = "Admin — ";
         } else {
             profileNameSpan.innerText = "";
@@ -5900,7 +6456,7 @@ function applyPermissionsToUI() {
     }
     
     // Master admin or local mode: restore everything
-    if (!profile || dbMode !== 'firebase') {
+    if (!profile || !isCloudDb()) {
         tabs.forEach(tabId => {
             const link = document.querySelector(`.nav-item[data-tab="${tabId}"]`);
             if (link) link.parentElement.style.display = "";
@@ -6121,7 +6677,7 @@ function saveUserProfile(e) {
         permissions[sel.getAttribute("data-tab")] = sel.value;
     });
     
-    if (dbMode !== 'firebase') {
+    if (!isCloudDb()) {
         alert("La gestion des profils requiert le mode Firebase Cloud.");
         return;
     }
@@ -6139,37 +6695,59 @@ function saveUserProfile(e) {
         submitBtn.innerText = "Création en cours...";
         
         const docId = email.toLowerCase().replace(/[^a-z0-9]/g, "_");
-        const config = STATE.firebaseConfig || (firebase.apps.length ? firebase.app().options : {});
-        const secondaryApp = firebase.initializeApp(config, "SecondaryApp" + Date.now());
         
-        secondaryApp.auth().createUserWithEmailAndPassword(email, password)
-            .then(() => {
-                const profileObj = {
-                    id: docId,
-                    name,
-                    email,
-                    password,
-                    permissions
-                };
-                db.collection("profiles").doc(docId).set(profileObj)
-                    .then(() => {
-                        secondaryApp.delete();
-                        cancelProfileEdit();
-                        alert("Profil créé avec succès !");
-                    })
-                    .catch(err => {
-                        alert("Erreur d'enregistrement Firestore : " + err.message);
-                        secondaryApp.delete();
-                        submitBtn.disabled = false;
-                        submitBtn.innerText = "Enregistrer";
-                    });
-            })
-            .catch(err => {
-                alert("Erreur de création de compte d'accès : " + err.message);
-                secondaryApp.delete();
-                submitBtn.disabled = false;
-                submitBtn.innerText = "Enregistrer";
-            });
+        if (window.supabaseClient) {
+            window.supabaseClient.auth.signUp({ email, password }).catch(e => console.warn("Supabase auth signup notice:", e));
+            const profileObj = {
+                id: docId,
+                name,
+                email,
+                password,
+                permissions
+            };
+            db.collection("profiles").doc(docId).set(profileObj)
+                .then(() => {
+                    cancelProfileEdit();
+                    alert("Profil créé avec succès sur Supabase !");
+                })
+                .catch(err => {
+                    alert("Erreur d'enregistrement Supabase : " + err.message);
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = "Enregistrer";
+                });
+        } else if (window.firebase && firebase.apps && firebase.apps.length) {
+            const config = STATE.firebaseConfig || (firebase.apps.length ? firebase.app().options : {});
+            const secondaryApp = firebase.initializeApp(config, "SecondaryApp" + Date.now());
+            
+            secondaryApp.auth().createUserWithEmailAndPassword(email, password)
+                .then(() => {
+                    const profileObj = {
+                        id: docId,
+                        name,
+                        email,
+                        password,
+                        permissions
+                    };
+                    db.collection("profiles").doc(docId).set(profileObj)
+                        .then(() => {
+                            secondaryApp.delete();
+                            cancelProfileEdit();
+                            alert("Profil créé avec succès !");
+                        })
+                        .catch(err => {
+                            alert("Erreur d'enregistrement Firestore : " + err.message);
+                            secondaryApp.delete();
+                            submitBtn.disabled = false;
+                            submitBtn.innerText = "Enregistrer";
+                        });
+                })
+                .catch(err => {
+                    alert("Erreur de création de compte d'accès : " + err.message);
+                    secondaryApp.delete();
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = "Enregistrer";
+                });
+        }
     } else {
         // Edit existing profile
         const existing = (STATE.profiles || []).find(p => p.id === id);
@@ -6178,7 +6756,26 @@ function saveUserProfile(e) {
         submitBtn.disabled = true;
         submitBtn.innerText = "Mise à jour...";
         
-        if (password !== existing.password) {
+        const profileObj = {
+            id,
+            name,
+            email,
+            password,
+            permissions
+        };
+
+        if (window.supabaseClient) {
+            db.collection("profiles").doc(id).set(profileObj)
+                .then(() => {
+                    cancelProfileEdit();
+                    alert("Profil mis à jour avec succès sur Supabase !");
+                })
+                .catch(err => {
+                    alert("Erreur de mise à jour Supabase : " + err.message);
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = "Enregistrer";
+                });
+        } else if (password !== existing.password && window.firebase && firebase.apps && firebase.apps.length) {
             const config = STATE.firebaseConfig || (firebase.apps.length ? firebase.app().options : {});
             const secondaryApp = firebase.initializeApp(config, "SecondaryApp" + Date.now());
             secondaryApp.auth().signInWithEmailAndPassword(email, existing.password)
@@ -6202,13 +6799,6 @@ function saveUserProfile(e) {
                 });
                 
             function updateDocAndFinish() {
-                const profileObj = {
-                    id,
-                    name,
-                    email,
-                    password,
-                    permissions
-                };
                 db.collection("profiles").doc(id).set(profileObj)
                     .then(() => {
                         secondaryApp.delete();
@@ -6223,21 +6813,13 @@ function saveUserProfile(e) {
                     });
             }
         } else {
-            // Password did not change
-            const profileObj = {
-                id,
-                name,
-                email,
-                password,
-                permissions
-            };
             db.collection("profiles").doc(id).set(profileObj)
                 .then(() => {
                     cancelProfileEdit();
                     alert("Profil mis à jour avec succès !");
                 })
                 .catch(err => {
-                    alert("Erreur de mise à jour Firestore : " + err.message);
+                    alert("Erreur de mise à jour : " + err.message);
                     submitBtn.disabled = false;
                     submitBtn.innerText = "Enregistrer";
                 });
@@ -6246,7 +6828,7 @@ function saveUserProfile(e) {
 }
 
 function deleteUserProfile(id) {
-    if (dbMode !== 'firebase') return;
+    if (!isCloudDb()) return;
     if (!confirm("Voulez-vous vraiment supprimer ce profil ? Il n'aura plus d'accès à l'application.")) return;
     
     db.collection("profiles").doc(id).delete()
@@ -6322,7 +6904,7 @@ function saveEvolutionNote(e) {
         created_at: new Date().toISOString()
     };
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection("evolutionNotes").doc(newNote.id).set(newNote)
             .then(() => {
                 textInput.value = "";
@@ -6343,7 +6925,7 @@ function toggleEvolutionNoteStatus(id) {
 
     const newStatus = n.status === "Fait" ? "À faire" : "Fait";
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection("evolutionNotes").doc(id).update({ status: newStatus });
     } else {
         n.status = newStatus;
@@ -6355,7 +6937,7 @@ function toggleEvolutionNoteStatus(id) {
 function deleteEvolutionNote(id) {
     if (!confirm("Voulez-vous vraiment supprimer cette note d'évolution ?")) return;
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection("evolutionNotes").doc(id).delete();
     } else {
         STATE.evolutionNotes = (STATE.evolutionNotes || []).filter(item => item.id !== id);
@@ -6653,7 +7235,7 @@ function savePartnerAssociation(e) {
 
     const assocData = { id, nom, contact, email, phone, adresse, siret };
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection("partnerAssociations").doc(id).set(assocData)
             .then(() => {
                 cancelPartnerAssocEdit();
@@ -6674,7 +7256,7 @@ function savePartnerAssociation(e) {
 function deletePartnerAssociation(id) {
     if (!confirm("Voulez-vous vraiment supprimer cette association partenaire ?")) return;
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection("partnerAssociations").doc(id).delete()
             .then(() => refreshAllViews())
             .catch(err => alert("Erreur de suppression : " + err.message));
@@ -6899,7 +7481,7 @@ function savePartnerInvoiceEdits() {
         };
         STATE.emitterInfo = emitter;
         localStorage.setItem("foyer_emitter_info", JSON.stringify(emitter));
-        if (dbMode === 'firebase') {
+        if (isCloudDb()) {
             db.collection("settings").doc("emitter").set(emitter).catch(err => console.error(err));
         }
     }
@@ -6923,7 +7505,7 @@ function savePartnerInvoiceEdits() {
             if (idx >= 0) STATE.partnerAssociations[idx] = assocData;
             else STATE.partnerAssociations.push(assocData);
 
-            if (dbMode === 'firebase') {
+            if (isCloudDb()) {
                 db.collection("partnerAssociations").doc(id).set(assocData).catch(err => console.error(err));
             }
         }
@@ -7048,7 +7630,7 @@ function saveSharedEquipment(e) {
         partners
     };
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         if (id) {
             db.collection("sharedEquipments").doc(id).update(data)
                 .then(() => {
@@ -7109,7 +7691,7 @@ function cancelEquipmentEdit() {
 function deleteSharedEquipment(id) {
     if (!confirm("Voulez-vous vraiment supprimer cet équipement partagé ?")) return;
 
-    if (dbMode === 'firebase') {
+    if (isCloudDb()) {
         db.collection("sharedEquipments").doc(id).delete()
             .then(() => refreshAllViews())
             .catch(err => alert("Erreur lors de la suppression : " + err.message));
@@ -7525,7 +8107,7 @@ function parseAndImportExcelFile(file) {
                                     code_comptable: "600"
                                 };
                                 STATE.categories.push(catObj);
-                                if (dbMode === 'firebase') {
+                                if (isCloudDb()) {
                                     db.collection("categories").doc(catObj.id).set(catObj).catch(err => console.error(err));
                                 }
                             }
@@ -7577,7 +8159,7 @@ function parseAndImportExcelFile(file) {
                         };
 
                         STATE.transactions.push(newTx);
-                        if (dbMode === 'firebase') {
+                        if (isCloudDb()) {
                             db.collection("transactions").doc(newTx.id).set(newTx).catch(err => console.error(err));
                         }
                         countTx++;
@@ -7629,7 +8211,7 @@ function parseAndImportExcelFile(file) {
                             if (dateAdh) existing.date_adhesion = dateAdh;
                             existing.cotisation_reglee = cotisReg;
                             existing.section = section || existing.section;
-                            if (dbMode === 'firebase') {
+                            if (isCloudDb()) {
                                 db.collection("adherents").doc(existing.id).set(existing).catch(err => console.error(err));
                             }
                         } else {
@@ -7638,7 +8220,7 @@ function parseAndImportExcelFile(file) {
                                 nom, prenom, email, telephone: tel, adresse, date_adhesion: dateAdh, cotisation_reglee: cotisReg, section
                             };
                             STATE.adherents.push(newAdh);
-                            if (dbMode === 'firebase') {
+                            if (isCloudDb()) {
                                 db.collection("adherents").doc(newAdh.id).set(newAdh).catch(err => console.error(err));
                             }
                         }
@@ -7673,7 +8255,7 @@ function parseAndImportExcelFile(file) {
                             existing.date_fin = dateFin || existing.date_fin;
                             existing.description = desc || existing.description;
                             existing.statut = statut || existing.statut;
-                            if (dbMode === 'firebase') {
+                            if (isCloudDb()) {
                                 db.collection("manifestations").doc(existing.id).set(existing).catch(err => console.error(err));
                             }
                         } else {
@@ -7682,7 +8264,7 @@ function parseAndImportExcelFile(file) {
                                 nom, date_debut: dateDeb, date_fin: dateFin, description: desc, statut
                             };
                             STATE.manifestations.push(newMan);
-                            if (dbMode === 'firebase') {
+                            if (isCloudDb()) {
                                 db.collection("manifestations").doc(newMan.id).set(newMan).catch(err => console.error(err));
                             }
                         }
@@ -7723,7 +8305,7 @@ function parseAndImportExcelFile(file) {
                             num_cheque: numCheque, cheque_encaisse: chequeEnc
                         };
                         STATE.investissements.push(newInv);
-                        if (dbMode === 'firebase') {
+                        if (isCloudDb()) {
                             db.collection("investissements").doc(newInv.id).set(newInv).catch(err => console.error(err));
                         }
                         countInv++;
@@ -7775,8 +8357,8 @@ async function resetDatabaseForTesting(mode = 'compta') {
     // Always update LocalStorage cache
     saveState();
 
-    // 2. Perform robust batch deletes in Firebase if active
-    if (STATE.firebaseEnabled && window.db) {
+    // 2. Perform robust batch deletes in Cloud DB if active
+    if (isCloudDb() && window.db) {
         try {
             for (const colName of collectionsToClear) {
                 const snapshot = await db.collection(colName).get();
@@ -7798,7 +8380,7 @@ async function resetDatabaseForTesting(mode = 'compta') {
                 }
             }
         } catch (err) {
-            console.error("Erreur lors de la suppression Firebase:", err);
+            console.error("Erreur lors de la suppression Cloud:", err);
         }
     }
 

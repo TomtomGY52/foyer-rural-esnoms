@@ -12,7 +12,12 @@
       "**/.*",
       "**/node_modules/**",
       "FR.xlsm",
-      "BDD/**"
+      "BDD/**",
+      "*.mp4",
+      "*.xlsx",
+      "*.xltx",
+      "imported_data.json",
+      "scratch/**"
     ],
     "headers": [
       {
