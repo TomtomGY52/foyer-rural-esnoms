@@ -1,6 +1,6 @@
 // ============================================================================
 // Safe Lucide icon rendering helper
-const APP_VERSION = "8.4";
+const APP_VERSION = "8.5";
 
 function safeCreateIcons() {
     if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
@@ -611,16 +611,24 @@ function createSupabaseDbAdapter(supabaseClient) {
                     operations.push({ type: 'delete', col: docRef.col, id: docRef.id });
                 },
                 async commit() {
+                    const deletesByTable = {};
                     for (const op of operations) {
                         const tbl = getTableName(op.col);
                         if (op.type === 'delete') {
-                            await supabaseClient.from(tbl).delete().eq('id', op.id);
+                            if (!deletesByTable[tbl]) deletesByTable[tbl] = [];
+                            deletesByTable[tbl].push(op.id);
                         } else if (op.type === 'set') {
                             const payload = sanitizeForPostgres(tbl, { id: op.id, ...op.data });
                             await supabaseClient.from(tbl).upsert(payload);
                         } else if (op.type === 'update') {
                             const payload = sanitizeForPostgres(tbl, op.data);
                             await supabaseClient.from(tbl).update(payload).eq('id', op.id);
+                        }
+                    }
+                    for (const [tbl, ids] of Object.entries(deletesByTable)) {
+                        for (let i = 0; i < ids.length; i += 100) {
+                            const chunk = ids.slice(i, i + 100);
+                            await supabaseClient.from(tbl).delete().in('id', chunk);
                         }
                     }
                 }
@@ -8357,30 +8365,38 @@ async function resetDatabaseForTesting(mode = 'compta') {
     // Always update LocalStorage cache
     saveState();
 
-    // 2. Perform robust batch deletes in Cloud DB if active
+    // 2. Perform fast & complete delete in Cloud DB if active
     if (isCloudDb() && window.db) {
         try {
-            for (const colName of collectionsToClear) {
-                const snapshot = await db.collection(colName).get();
-                if (!snapshot.empty) {
-                    const batchSize = 400;
-                    let batch = db.batch();
-                    let count = 0;
-                    for (const doc of snapshot.docs) {
-                        batch.delete(doc.ref);
-                        count++;
-                        if (count % batchSize === 0) {
-                            await batch.commit();
-                            batch = db.batch();
+            if (window.supabaseClient) {
+                for (const colName of collectionsToClear) {
+                    const tbl = getTableName(colName);
+                    await window.supabaseClient.from(tbl).delete().neq('id', '___never___');
+                }
+            } else {
+                for (const colName of collectionsToClear) {
+                    const snapshot = await db.collection(colName).get();
+                    if (!snapshot.empty) {
+                        const batchSize = 400;
+                        let batch = db.batch();
+                        let count = 0;
+                        for (const doc of snapshot.docs) {
+                            batch.delete(doc.ref);
+                            count++;
+                            if (count % batchSize === 0) {
+                                await batch.commit();
+                                batch = db.batch();
+                            }
                         }
-                    }
-                    if (count % batchSize !== 0) {
-                        await batch.commit();
+                        if (count % batchSize !== 0) {
+                            await batch.commit();
+                        }
                     }
                 }
             }
         } catch (err) {
             console.error("Erreur lors de la suppression Cloud:", err);
+            alert("Erreur lors de la suppression sur le serveur : " + err.message);
         }
     }
 
