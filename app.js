@@ -1,6 +1,6 @@
 // ============================================================================
 // Safe Lucide icon rendering helper
-const APP_VERSION = "8.8";
+const APP_VERSION = "8.9";
 
 function safeCreateIcons() {
     if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
@@ -2563,39 +2563,20 @@ function renderBilanAnnuel() {
                     depTotal += amount;
                     catDepTotals[catName] = (catDepTotals[catName] || 0) + amount;
                 }
-            } else {
-                // Manifestations link
-                const manif = STATE.manifestations.find(m => m.id === t.manifestation_id);
-                if (manif) {
-                    if (!manifTotals[manif.id]) {
-                        manifTotals[manif.id] = { nom: manif.nom, date: manif.date_debut, recettes: 0, depenses: 0 };
-                    }
-                    if (t.type_flux === "Recette") {
-                        manifTotals[manif.id].recettes += amount;
-                    } else {
-                        manifTotals[manif.id].depenses += amount;
-                    }
-                }
             }
         }
     });
 
-    // 1.b Process cash floats as baseline expenses for active period manifestations
+    // 1.b Process manifestation totals using full financial aggregates (stands, receipts, partners, expenses)
     STATE.manifestations.forEach(m => {
         if (isDateInPeriod(m.date_debut, STATE.currentPeriod)) {
-            const stands = (STATE.feteRuraleStands || []).filter(s => s.manifestation_id === m.id);
-            let mFondTotal = 0;
-            stands.forEach(s => {
-                mFondTotal += Number(s.fond_de_caisse) || 0;
-            });
-            
-            if (mFondTotal > 0) {
-                // Add to the specific manifestation totals only (not overall annual expenses)
-                if (!manifTotals[m.id]) {
-                    manifTotals[m.id] = { nom: m.nom, date: m.date_debut, recettes: 0, depenses: 0 };
-                }
-                manifTotals[m.id].depenses += mFondTotal;
-            }
+            const finances = getManifestationFinances(m.id);
+            manifTotals[m.id] = {
+                nom: m.nom,
+                date: m.date_debut,
+                recettes: finances.recettes,
+                depenses: finances.depenses
+            };
         }
     });
 
@@ -2849,6 +2830,57 @@ function renderBilanAnnuel() {
 // ============================================================================
 // --- 9. MANIFESTATIONS (EVENTS) MANAGEMENT ---
 // ============================================================================
+function getManifestationFinances(manifId) {
+    let recettes = 0;
+    let depenses = 0;
+
+    // 1. Stand receipts
+    const receipts = (STATE.feteRuraleReceipts || []).filter(r => r.manifestation_id === manifId);
+    receipts.forEach(r => {
+        recettes += Number(r.montant) || 0;
+    });
+
+    // 2. Paid partner sponsorships
+    const partners = (STATE.feteRuralePartners || []).filter(p => p.manifestation_id === manifId);
+    partners.forEach(p => {
+        if (p.paye) {
+            recettes += Number(p.montant_sponsoring) || 0;
+        }
+    });
+
+    // 3. Other recettes from general transactions linked to this manifestation
+    (STATE.transactions || []).forEach(t => {
+        if (t.manifestation_id === manifId && t.type_flux === "Recette" && t.paye) {
+            recettes += Number(t.montant) || 0;
+        }
+    });
+
+    // 4. Stands cash floats (fonds de caisse)
+    const stands = (STATE.feteRuraleStands || []).filter(s => s.manifestation_id === manifId);
+    stands.forEach(s => {
+        depenses += Number(s.fond_de_caisse) || 0;
+    });
+
+    // 5. Manifestation specific expenses
+    const expenses = (STATE.feteRuraleExpenses || []).filter(e => e.manifestation_id === manifId);
+    expenses.forEach(e => {
+        depenses += Number(e.montant) || 0;
+    });
+
+    // 6. Other expenses from general transactions linked to this manifestation (excluding negative reserve deductions)
+    (STATE.transactions || []).forEach(t => {
+        if (t.manifestation_id === manifId && t.type_flux === "Dépense" && t.paye && t.moyen_payement !== 'Réserve' && Number(t.montant) > 0) {
+            depenses += Number(t.montant) || 0;
+        }
+    });
+
+    return {
+        recettes,
+        depenses,
+        bilan: recettes - depenses
+    };
+}
+
 function renderManifestationsList() {
     const listBody = document.getElementById("manifestations-table-body");
     listBody.innerHTML = "";
@@ -2860,26 +2892,12 @@ function renderManifestationsList() {
 
     // Calculate finances and clone for sorting (filtered by period)
     const list = STATE.manifestations.filter(m => isDateInPeriod(m.date_debut, STATE.currentPeriod)).map(m => {
-        let rSum = 0;
-        let dSum = 0;
-        STATE.transactions.forEach(t => {
-            if (t.manifestation_id === m.id && t.paye) {
-                if (t.type_flux === "Recette") rSum += Number(t.montant);
-                else dSum += Number(t.montant);
-            }
-        });
-        
-        // Include cash floats of stands in the event's expenses
-        const stands = (STATE.feteRuraleStands || []).filter(s => s.manifestation_id === m.id);
-        stands.forEach(s => {
-            dSum += Number(s.fond_de_caisse) || 0;
-        });
-
+        const finances = getManifestationFinances(m.id);
         return {
             ...m,
-            recettes: rSum,
-            depenses: dSum,
-            bilan: rSum - dSum
+            recettes: finances.recettes,
+            depenses: finances.depenses,
+            bilan: finances.bilan
         };
     });
 
