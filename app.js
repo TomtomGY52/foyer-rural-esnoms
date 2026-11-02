@@ -1,6 +1,6 @@
 // ============================================================================
 // Safe Lucide icon rendering helper
-const APP_VERSION = "8.7";
+const APP_VERSION = "8.8";
 
 function safeCreateIcons() {
     if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
@@ -2108,14 +2108,21 @@ function renderGeneralExpensesList() {
             chequeBadge = `<span class="badge" style="background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeBorder}; margin-left: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer;" onclick="toggleChequeEncaisse('${t.id}', event)" title="Chèque : Cliquer pour basculer l'état d'encaissement">💳 Chèque${numStr} • <i data-lucide="${iconName}" style="width: 11px; height: 11px; vertical-align: middle; margin-right: 2px;"></i> ${statusText}</span>`;
         }
 
-        const amountStyle = isReallocated ? "color: #059669;" : "color: var(--danger);";
-        const amountStr = isReallocated ? `-${Number(t.montant).toFixed(2)} €` : `${Number(t.montant).toFixed(2)} €`;
+        let reserveBadge = "";
+        if (t.moyen_payement === "Réserve") {
+            reserveBadge = `<span class="badge" style="background: rgba(99, 102, 241, 0.15); color: var(--primary); border: 1px solid rgba(99, 102, 241, 0.3); margin-left: 6px; font-size: 0.75rem; font-weight: 600;">📦 Réserve (Déduit)</span>`;
+        }
+
+        const isNegative = Number(t.montant) < 0 || isReallocated;
+        const amountStyle = isNegative ? "color: #059669;" : "color: var(--danger);";
+        const amountVal = Math.abs(Number(t.montant));
+        const amountStr = isNegative ? `-${amountVal.toFixed(2)} €` : `${amountVal.toFixed(2)} €`;
 
         listBody.innerHTML += `
             <tr>
                 <td>${dateStr}</td>
                 <td>${catLabel}</td>
-                <td style="font-weight: 500;">${t.description}${manifBadge}${eqBadge}${chequeBadge}</td>
+                <td style="font-weight: 500;">${t.description}${manifBadge}${eqBadge}${chequeBadge}${reserveBadge}</td>
                 <td style="font-weight: 600; text-align: right; ${amountStyle}">${amountStr}</td>
                 <td>
                     <span class="badge ${payeBadgeClass}" style="cursor: pointer;" onclick="toggleTransactionPaid('${t.id}')" title="Changer statut de paiement">
@@ -4968,7 +4975,7 @@ function syncFeteFinancialToTransactions(txId, txData, callback) {
             moyen_payement: txData.moyen_payement || "Espèces",
             categorie_id: txData.categorie_id,
             adherent_id: "",
-            manifestation_id: txData.manifestation_id !== undefined ? txData.manifestation_id : "man-fete-rurale",
+            manifestation_id: txData.manifestation_id !== undefined ? txData.manifestation_id : "",
             investissement_id: "",
             produit_id: ""
         };
@@ -5026,7 +5033,7 @@ function syncFeteFinancialToTransactions(txId, txData, callback) {
                     paye: txData.paye !== undefined ? txData.paye : true,
                     moyen_payement: txData.moyen_payement || "Espèces",
                     categorie_id: txData.categorie_id,
-                    manifestation_id: txData.manifestation_id !== undefined ? txData.manifestation_id : (STATE.transactions[idx].manifestation_id || "man-fete-rurale")
+                    manifestation_id: txData.manifestation_id !== undefined ? txData.manifestation_id : (STATE.transactions[idx].manifestation_id || "")
                 };
                 saveState();
                 if (callback) callback(txId);
@@ -5225,33 +5232,17 @@ function saveFeteReceipt(e) {
     const montant = Number(document.getElementById("fete-receipt-montant").value) || 0;
     const comment = document.getElementById("fete-receipt-comment").value.trim();
     
-    const standObj = STATE.feteRuraleStands.find(s => s.id === standId);
-    const standNom = standObj ? standObj.nom : "Stand";
-    
     const rec = STATE.feteRuraleReceipts.find(r => r.id === id);
     const existingTxId = rec ? rec.transaction_id : "";
-    
-    const containsLoto = standNom.toLowerCase().includes("loto") || standNom.toLowerCase().includes("tombola") || standNom.toLowerCase().includes("enveloppe");
-    
-    const txData = {
-        date,
-        description: `[Stand: ${standNom}] ${comment || 'Relève caisse'}`,
-        type_flux: 'Recette',
-        montant,
-        paye: true,
-        moyen_payement: 'Espèces',
-        categorie_id: containsLoto ? 'cat-13' : 'cat-11',
-        manifestation_id: activeManifestationId
-    };
-    
-    syncFeteFinancialToTransactions(existingTxId, txData, (newTxId) => {
+
+    const finishSave = () => {
         const receiptObj = {
             id,
             stand_id: standId,
             date,
             montant,
             comment,
-            transaction_id: newTxId,
+            transaction_id: "",
             manifestation_id: activeManifestationId
         };
         saveFeteData("feteRuraleReceipts", receiptObj, () => {
@@ -5260,7 +5251,13 @@ function saveFeteReceipt(e) {
             document.getElementById("fete-receipt-id").value = "";
             refreshAllViews();
         });
-    });
+    };
+
+    if (existingTxId) {
+        deleteFeteFinancialTransaction(existingTxId, finishSave);
+    } else {
+        finishSave();
+    }
 }
 
 function deleteFeteReceipt(id) {
@@ -5270,13 +5267,19 @@ function deleteFeteReceipt(id) {
     }
     const rec = STATE.feteRuraleReceipts.find(r => r.id === id);
     if (!rec) return;
-    if (!confirm("Voulez-vous vraiment supprimer ce relevé de caisse ? La transaction comptable associée sera également supprimée.")) return;
+    if (!confirm("Voulez-vous vraiment supprimer ce relevé de caisse ?")) return;
     
-    deleteFeteFinancialTransaction(rec.transaction_id, () => {
+    if (rec.transaction_id) {
+        deleteFeteFinancialTransaction(rec.transaction_id, () => {
+            deleteFeteData("feteRuraleReceipts", id, () => {
+                refreshAllViews();
+            });
+        });
+    } else {
         deleteFeteData("feteRuraleReceipts", id, () => {
             refreshAllViews();
         });
-    });
+    }
 }
 
 // --- EXPENSES CRUD & HANDLERS ---
@@ -5364,98 +5367,93 @@ function saveFeteExpense(e) {
     const cheque_encaisse = document.getElementById("fete-expense-cheque-encaisse") ? document.getElementById("fete-expense-cheque-encaisse").checked : false;
     
     const exp = STATE.feteRuraleExpenses.find(x => x.id === id);
-    const existingTxId = exp ? exp.transaction_id : "";
-    const existingReserveTxId = exp ? (exp.reserve_transaction_id || "") : "";
-    
-    const txData = {
-        date,
-        description: `[Dépense Fête] ${description}`,
-        type_flux: 'Dépense',
-        montant,
-        paye,
-        moyen_payement: moyen,
-        categorie_id: feteCat,
-        manifestation_id: activeManifestationId,
-        equipement_id,
-        num_cheque,
-        cheque_encaisse
-    };
-    
-    syncFeteFinancialToTransactions(existingTxId, txData, (newTxId) => {
-        if (moyen === 'Réserve') {
-            const reserveTxData = {
-                date,
-                description: `[Déduction Réserve] ${description}`,
-                type_flux: 'Dépense',
-                montant: -montant,
-                paye,
-                moyen_payement: 'Réserve',
-                categorie_id: feteCat,
-                manifestation_id: "",
-                equipement_id: ""
-            };
-            
-            syncFeteFinancialToTransactions(existingReserveTxId, reserveTxData, (newReserveTxId) => {
-                const expenseObj = {
-                    id,
-                    description,
-                    date,
-                    montant,
-                    paye,
-                    moyen_payement: moyen,
-                    paye_a: payea,
-                    categorie: feteCat,
-                    commentaire: comment,
-                    scan,
-                    transaction_id: newTxId,
-                    reserve_transaction_id: newReserveTxId,
-                    manifestation_id: activeManifestationId,
-                    equipement_id,
-                    num_cheque,
-                    cheque_encaisse
-                };
-                saveFeteData("feteRuraleExpenses", expenseObj, () => {
-                    closeModal("modal-fete-expense");
-                    document.getElementById("form-fete-expense").reset();
-                    document.getElementById("fete-expense-id").value = "";
-                    refreshAllViews();
-                });
-            });
-        } else {
-            if (existingReserveTxId) {
-                deleteFeteFinancialTransaction(existingReserveTxId, () => {
-                    saveExpenseAndFinish();
-                });
-            } else {
-                saveExpenseAndFinish();
-            }
+    const existingTxId = exp ? (exp.reserve_transaction_id || exp.transaction_id || "") : "";
+    const otherTxId = (exp && exp.reserve_transaction_id && exp.transaction_id && exp.reserve_transaction_id !== exp.transaction_id) ? exp.transaction_id : "";
 
-            function saveExpenseAndFinish() {
-                const expenseObj = {
-                    id,
-                    description,
-                    date,
-                    montant,
-                    paye,
-                    moyen_payement: moyen,
-                    paye_a: payea,
-                    categorie: feteCat,
-                    commentaire: comment,
-                    scan,
-                    transaction_id: newTxId,
-                    reserve_transaction_id: "",
-                    manifestation_id: activeManifestationId,
-                    equipement_id
-                };
-                saveFeteData("feteRuraleExpenses", expenseObj, () => {
-                    closeModal("modal-fete-expense");
-                    document.getElementById("form-fete-expense").reset();
-                    document.getElementById("fete-expense-id").value = "";
-                    refreshAllViews();
-                });
-            }
+    // Delete any secondary/duplicate transaction if it previously existed
+    if (otherTxId) {
+        deleteFeteFinancialTransaction(otherTxId);
+    }
+    
+    if (moyen === 'Réserve') {
+        // Seules les dépenses dont le moyen est "Réserve" créent une transaction comptable, et en négatif (-montant)
+        const reserveTxData = {
+            date,
+            description: `[Déduction Réserve] ${description}`,
+            type_flux: 'Dépense',
+            montant: -Math.abs(montant),
+            prix: -Math.abs(montant),
+            quantite: 1,
+            paye: true,
+            moyen_payement: 'Réserve',
+            categorie_id: feteCat,
+            manifestation_id: "",
+            equipement_id: ""
+        };
+
+        syncFeteFinancialToTransactions(existingTxId, reserveTxData, (newTxId) => {
+            const expenseObj = {
+                id,
+                description,
+                date,
+                montant,
+                paye,
+                moyen_payement: moyen,
+                paye_a: payea,
+                categorie: feteCat,
+                commentaire: comment,
+                scan,
+                transaction_id: newTxId,
+                reserve_transaction_id: newTxId,
+                manifestation_id: activeManifestationId,
+                equipement_id,
+                num_cheque,
+                cheque_encaisse
+            };
+            saveFeteData("feteRuraleExpenses", expenseObj, () => {
+                closeModal("modal-fete-expense");
+                document.getElementById("form-fete-expense").reset();
+                document.getElementById("fete-expense-id").value = "";
+                refreshAllViews();
+            });
+        });
+    } else {
+        // Pour tout autre moyen de paiement (Espèces, Chèque, CB, Virement),
+        // AUCUNE transaction dans les transactions générales (propre au budget manifestation).
+        // Si cette dépense était précédemment payée par 'Réserve', supprimer la transaction associée.
+        const finishSave = () => {
+            const expenseObj = {
+                id,
+                description,
+                date,
+                montant,
+                paye,
+                moyen_payement: moyen,
+                paye_a: payea,
+                categorie: feteCat,
+                commentaire: comment,
+                scan,
+                transaction_id: "",
+                reserve_transaction_id: "",
+                manifestation_id: activeManifestationId,
+                equipement_id,
+                num_cheque,
+                cheque_encaisse
+            };
+            saveFeteData("feteRuraleExpenses", expenseObj, () => {
+                closeModal("modal-fete-expense");
+                document.getElementById("form-fete-expense").reset();
+                document.getElementById("fete-expense-id").value = "";
+                refreshAllViews();
+            });
+        };
+
+        if (existingTxId) {
+            deleteFeteFinancialTransaction(existingTxId, finishSave);
+        } else {
+            finishSave();
         }
-    });
+    }
 }
 
 function deleteFeteExpense(id) {
@@ -5465,21 +5463,26 @@ function deleteFeteExpense(id) {
     }
     const exp = STATE.feteRuraleExpenses.find(e => e.id === id);
     if (!exp) return;
-    if (!confirm("Voulez-vous vraiment supprimer cette dépense ? La transaction comptable associée sera également supprimée.")) return;
+    if (!confirm("Voulez-vous vraiment supprimer cette dépense ?")) return;
     
-    deleteFeteFinancialTransaction(exp.transaction_id, () => {
-        if (exp.reserve_transaction_id) {
-            deleteFeteFinancialTransaction(exp.reserve_transaction_id, () => {
-                deleteFeteData("feteRuraleExpenses", id, () => {
-                    refreshAllViews();
-                });
-            });
-        } else {
-            deleteFeteData("feteRuraleExpenses", id, () => {
-                refreshAllViews();
-            });
-        }
-    });
+    const txIdToDelete = exp.reserve_transaction_id || exp.transaction_id || "";
+    const otherTxId = (exp.reserve_transaction_id && exp.transaction_id && exp.reserve_transaction_id !== exp.transaction_id) ? exp.transaction_id : "";
+
+    if (otherTxId) {
+        deleteFeteFinancialTransaction(otherTxId);
+    }
+
+    const finishDelete = () => {
+        deleteFeteData("feteRuraleExpenses", id, () => {
+            refreshAllViews();
+        });
+    };
+
+    if (txIdToDelete) {
+        deleteFeteFinancialTransaction(txIdToDelete, finishDelete);
+    } else {
+        finishDelete();
+    }
 }
 
 // --- PARTNERS CRUD & HANDLERS ---
@@ -5528,60 +5531,32 @@ function saveFetePartner(e) {
     
     const part = STATE.feteRuralePartners.find(x => x.id === id);
     const existingTxId = part ? part.transaction_id : "";
-    
-    const txData = {
-        date: new Date().toISOString().split('T')[0],
-        description: `[Partenaire Fête] ${entreprise} (Sponsoring)`,
-        type_flux: 'Recette',
-        montant,
-        paye,
-        moyen_payement: moyen,
-        categorie_id: 'cat-3', // Sponsoring / Partenariats
-        manifestation_id: activeManifestationId
+
+    const finishSave = () => {
+        const partnerObj = {
+            id,
+            entreprise,
+            contact,
+            suivi_par: suivi,
+            paye,
+            moyen_payement: moyen,
+            montant_sponsoring: montant,
+            logo,
+            transaction_id: "",
+            manifestation_id: activeManifestationId
+        };
+        saveFeteData("feteRuralePartners", partnerObj, () => {
+            closeModal("modal-fete-partner");
+            document.getElementById("form-fete-partner").reset();
+            document.getElementById("fete-partner-id").value = "";
+            refreshAllViews();
+        });
     };
-    
-    if (paye) {
-        syncFeteFinancialToTransactions(existingTxId, txData, (newTxId) => {
-            const partnerObj = {
-                id,
-                entreprise,
-                contact,
-                suivi_par: suivi,
-                paye,
-                moyen_payement: moyen,
-                montant_sponsoring: montant,
-                logo,
-                transaction_id: newTxId,
-                manifestation_id: activeManifestationId
-            };
-            saveFeteData("feteRuralePartners", partnerObj, () => {
-                closeModal("modal-fete-partner");
-                document.getElementById("form-fete-partner").reset();
-                document.getElementById("fete-partner-id").value = "";
-                refreshAllViews();
-            });
-        });
+
+    if (existingTxId) {
+        deleteFeteFinancialTransaction(existingTxId, finishSave);
     } else {
-        deleteFeteFinancialTransaction(existingTxId, () => {
-            const partnerObj = {
-                id,
-                entreprise,
-                contact,
-                suivi_par: suivi,
-                paye,
-                moyen_payement: moyen,
-                montant_sponsoring: montant,
-                logo,
-                transaction_id: "",
-                manifestation_id: activeManifestationId
-            };
-            saveFeteData("feteRuralePartners", partnerObj, () => {
-                closeModal("modal-fete-partner");
-                document.getElementById("form-fete-partner").reset();
-                document.getElementById("fete-partner-id").value = "";
-                refreshAllViews();
-            });
-        });
+        finishSave();
     }
 }
 
@@ -5592,13 +5567,19 @@ function deleteFetePartner(id) {
     }
     const part = STATE.feteRuralePartners.find(p => p.id === id);
     if (!part) return;
-    if (!confirm("Voulez-vous vraiment supprimer ce partenaire ? La transaction comptable associée sera également supprimée.")) return;
+    if (!confirm("Voulez-vous vraiment supprimer ce partenaire ?")) return;
     
-    deleteFeteFinancialTransaction(part.transaction_id, () => {
+    if (part.transaction_id) {
+        deleteFeteFinancialTransaction(part.transaction_id, () => {
+            deleteFeteData("feteRuralePartners", id, () => {
+                refreshAllViews();
+            });
+        });
+    } else {
         deleteFeteData("feteRuralePartners", id, () => {
             refreshAllViews();
         });
-    });
+    }
 }
 
 // --- FETE RURALE CATEGORY EXPENSES POPOVER ---
