@@ -16,19 +16,19 @@
             errDiv.textContent += '\nError: ' + e.message + ' at ' + e.filename + ':' + e.lineno + ':' + e.colno;
         });
     </script>
-    <link rel="stylesheet" href="index.css?v=8.6">
+    <link rel="stylesheet" href="index.css?v=8.7">
     
     <!-- Favicon & PWA Icons -->
-    <link rel="icon" type="image/png" href="logo.png?v=8.6">
-    <link rel="shortcut icon" type="image/png" href="logo.png?v=8.6">
-    <link rel="manifest" href="manifest.json?v=8.6">
-    <link rel="apple-touch-icon" href="logo.png?v=8.6">
+    <link rel="icon" type="image/png" href="logo.png?v=8.7">
+    <link rel="shortcut icon" type="image/png" href="logo.png?v=8.7">
+    <link rel="manifest" href="manifest.json?v=8.7">
+    <link rel="apple-touch-icon" href="logo.png?v=8.7">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js?v=8.6')
+                navigator.serviceWorker.register('sw.js?v=8.7')
                     .then(reg => {
                         console.log('Service Worker registered successfully!', reg);
                         reg.update(); // Force immediate update check on load
@@ -52,7 +52,7 @@
     <!-- SheetJS CDN for Excel (.xlsx) Import/Export -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- Lucide Icons (Local Bundle) -->
-    <script src="lucide.min.js?v=8.6"></script>
+    <script src="lucide.min.js?v=8.7"></script>
     <!-- Supabase JS Client v2 (100% Cloud Backend) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -61,7 +61,7 @@
     <div id="login-screen" style="display: none;">
         <div class="login-box">
             <div class="login-header">
-                <img src="logo.png?v=8.6" alt="Logo" class="login-logo" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px;" id="login-logo-img">
+                <img src="logo.png?v=8.7" alt="Logo" class="login-logo" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px;" id="login-logo-img">
                 <h2>Foyer Rural d'Esnoms au Val</h2>
                 <p>Espace d'Administration Sécurisé</p>
             </div>
@@ -91,7 +91,7 @@
                 <i data-lucide="menu" style="width: 20px; height: 20px;"></i>
             </button>
             <div style="display: flex; align-items: center; gap: 8px;">
-                <img id="mobile-header-logo" src="logo.png?v=8.6" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;" />
+                <img id="mobile-header-logo" src="logo.png?v=8.7" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;" />
                 <span style="font-weight: 700; font-size: 0.95rem; color: var(--text-main);">Foyer Rural</span>
             </div>
             <div style="width: 36px;"></div>
@@ -104,7 +104,7 @@
         <aside class="sidebar">
             <div class="logo-container" style="border-bottom: none; padding-bottom: 0; display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px;">
                 <div class="logo-details" style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
-                    <img id="sidebar-logo" src="logo.png?v=8.6" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
+                    <img id="sidebar-logo" src="logo.png?v=8.7" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
                     <span class="logo-title" style="white-space: nowrap;">Foyer Rural d'Esnoms au Val</span>
                 </div>
                 <!-- Sidebar Toggle Button (Inside Sidebar Logo Container) -->
@@ -999,13 +999,13 @@
                     <!-- Version & Release Info Panel -->
                     <div class="glass-panel" style="grid-column: 1 / -1; display: flex; gap: 24px; align-items: flex-start; padding: 24px;">
                         <div style="background: rgba(99, 102, 241, 0.1); color: var(--primary); padding: 8px 14px; border-radius: 8px; font-weight: 700; font-family: monospace; font-size: 1.1rem; flex-shrink: 0; border: 1px solid rgba(99, 102, 241, 0.2);">
-                            v8.6
+                            v8.7
                         </div>
                         <div style="flex: 1;">
                             <h2 style="margin-top: 0; margin-bottom: 6px; font-size: 1.15rem; font-weight: 600; color: var(--text-main);">Version & Dernières Modifications</h2>
                             <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px; font-weight: 500;">Mise à jour : 2 novembre 2026</div>
                             <p style="color: var(--text-muted); margin: 0; font-size: 0.9rem; line-height: 1.5;">
-                                🚀 <strong>Bouton Dédié RAZ Transactions Uniquement & Protection Manifestations (v8.6)</strong> : Clarification des options de remise à zéro avec ajout d'un bouton dédié <strong>« RAZ Transactions Uniquement »</strong> qui supprime exclusivement les transactions comptables dans Supabase Cloud tout en préservant à 100% vos manifestations créées (ex: Loto), vos adhérents, catégories, investissements et paramètres.
+                                🚀 <strong>Formulaires Allégés & Quantité par Défaut (v8.7)</strong> : Pour les transactions comptables et les manifestations (dépenses, recettes, sponsors), seul le champ montant/prix est obligatoire. La quantité est automatiquement pré-remplie à 1 par défaut, et tous les autres champs facultatifs (date, description, catégorie, bénéficiaire...) adoptent des valeurs intelligentes si laissés vides.
                             </p>
                         </div>
                     </div>
@@ -1666,27 +1666,27 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="transaction-flux">Type de Flux</label>
-                        <select id="transaction-flux" onchange="toggleTransactionDetails(); updateTransactionCategoriesDropdown();" required>
+                        <select id="transaction-flux" onchange="toggleTransactionDetails(); updateTransactionCategoriesDropdown();">
                             <option value="Recette">Recette</option>
                             <option value="Dépense">Dépense</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label for="transaction-date">Date de Transaction</label>
-                        <input type="date" id="transaction-date" required>
+                        <input type="date" id="transaction-date">
                     </div>
                 </div>
                 
                 <div class="form-row">
                     <div class="form-group">
                         <label for="transaction-categorie">Catégorie</label>
-                        <select id="transaction-categorie" required>
+                        <select id="transaction-categorie">
                             <!-- categories dynamic options -->
                         </select>
                     </div>
                     <div class="form-group">
                         <label for="transaction-moyen">Moyen de Paiement</label>
-                        <select id="transaction-moyen" onchange="toggleChequeFields('transaction')" required>
+                        <select id="transaction-moyen" onchange="toggleChequeFields('transaction')">
                             <option value="Espèces">Espèces</option>
                             <option value="Chèque">Chèque</option>
                             <option value="Carte Bancaire">Carte Bancaire</option>
@@ -1708,12 +1708,12 @@
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="transaction-prix">Prix Unitaire (€)</label>
-                        <input type="number" id="transaction-prix" step="0.01" min="0" oninput="calcTransactionMontant()" required>
+                        <label for="transaction-prix">Prix Unitaire (€) *</label>
+                        <input type="number" id="transaction-prix" step="0.01" min="0" oninput="calcTransactionMontant()" placeholder="0.00" required>
                     </div>
                     <div class="form-group">
                         <label for="transaction-quantite">Quantité</label>
-                        <input type="number" id="transaction-quantite" step="1" min="1" oninput="calcTransactionMontant()" required>
+                        <input type="number" id="transaction-quantite" step="1" min="1" value="1" oninput="calcTransactionMontant()">
                     </div>
                 </div>
 
@@ -1730,7 +1730,7 @@
 
                 <div class="form-group">
                     <label for="transaction-desc">Description</label>
-                    <input type="text" id="transaction-desc" required>
+                    <input type="text" id="transaction-desc" placeholder="Ex: Achat matériel, Vente boissons...">
                 </div>
 
                 <!-- Custom Linkages -->
@@ -1797,21 +1797,21 @@
                 <input type="hidden" id="manifestation-id">
                 <div class="form-group">
                     <label for="manifestation-nom">Nom de la Manifestation</label>
-                    <input type="text" id="manifestation-nom" required>
+                    <input type="text" id="manifestation-nom" placeholder="Ex: Fête Patronale 2026">
                 </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label for="manifestation-debut">Date de Début</label>
-                        <input type="date" id="manifestation-debut" required>
+                        <input type="date" id="manifestation-debut">
                     </div>
                     <div class="form-group">
                         <label for="manifestation-fin">Date de Fin</label>
-                        <input type="date" id="manifestation-fin" required>
+                        <input type="date" id="manifestation-fin">
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="manifestation-lieu">Lieu</label>
-                    <input type="text" id="manifestation-lieu" required>
+                    <input type="text" id="manifestation-lieu" placeholder="Ex: Salle des fêtes">
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('modal-manifestation')">Annuler</button>
@@ -2028,11 +2028,11 @@
                 <input type="hidden" id="fete-stand-id">
                 <div class="form-group">
                     <label for="fete-stand-nom">Nom du Stand</label>
-                    <input type="text" id="fete-stand-nom" placeholder="Ex: Buvette, Restauration, Enveloppes" required>
+                    <input type="text" id="fete-stand-nom" placeholder="Ex: Buvette, Restauration, Enveloppes">
                 </div>
                 <div class="form-group">
                     <label for="fete-stand-fond">Fond de Caisse Initial (€)</label>
-                    <input type="number" id="fete-stand-fond" step="0.01" min="0" value="0.00" required>
+                    <input type="number" id="fete-stand-fond" step="0.01" min="0" value="0.00">
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('modal-fete-stand')">Annuler</button>
@@ -2059,11 +2059,11 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="fete-receipt-date">Date de relève</label>
-                        <input type="date" id="fete-receipt-date" required>
+                        <input type="date" id="fete-receipt-date">
                     </div>
                     <div class="form-group">
-                        <label for="fete-receipt-montant">Montant Récupéré (€)</label>
-                        <input type="number" id="fete-receipt-montant" step="0.01" min="0.05" placeholder="0.00" required>
+                        <label for="fete-receipt-montant">Montant Récupéré (€) *</label>
+                        <input type="number" id="fete-receipt-montant" step="0.01" min="0.01" placeholder="0.00" required>
                     </div>
                 </div>
                 <div class="form-group">
@@ -2089,22 +2089,22 @@
                 <input type="hidden" id="fete-expense-id">
                 <div class="form-group">
                     <label for="fete-expense-desc">Description de la dépense</label>
-                    <input type="text" id="fete-expense-desc" placeholder="Ex: Achat gobelets recyclables, Cachet Artiste" required>
+                    <input type="text" id="fete-expense-desc" placeholder="Ex: Achat gobelets recyclables, Cachet Artiste">
                 </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label for="fete-expense-date">Date de dépense</label>
-                        <input type="date" id="fete-expense-date" required>
+                        <input type="date" id="fete-expense-date">
                     </div>
                     <div class="form-group">
-                        <label for="fete-expense-montant">Montant TTC (€)</label>
+                        <label for="fete-expense-montant">Montant TTC (€) *</label>
                         <input type="number" id="fete-expense-montant" step="0.01" min="0" placeholder="0.00" required>
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label for="fete-expense-cat">Catégorie</label>
-                        <select id="fete-expense-cat" required>
+                        <select id="fete-expense-cat">
                             <option value="animation">Animation</option>
                             <option value="buffet">Buffet</option>
                             <option value="buvette">Buvette</option>
@@ -2115,7 +2115,7 @@
                     </div>
                     <div class="form-group">
                         <label for="fete-expense-moyen">Moyen de Paiement</label>
-                        <select id="fete-expense-moyen" onchange="toggleChequeFields('fete-expense')" required>
+                        <select id="fete-expense-moyen" onchange="toggleChequeFields('fete-expense')">
                             <option value="Espèces">Espèces</option>
                             <option value="Chèque">Chèque</option>
                             <option value="Carte Bancaire">Carte Bancaire</option>
@@ -2138,7 +2138,7 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="fete-expense-payea">Payé à / Bénéficiaire</label>
-                        <input type="text" id="fete-expense-payea" placeholder="Ex: Grossiste Boissons, Artiste" required>
+                        <input type="text" id="fete-expense-payea" placeholder="Ex: Grossiste Boissons, Artiste">
                     </div>
                     <div class="form-group checkbox-group">
                         <input type="checkbox" id="fete-expense-paye" checked>
@@ -2174,27 +2174,27 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="fete-partner-entreprise">Nom de l'Entreprise</label>
-                        <input type="text" id="fete-partner-entreprise" placeholder="Ex: Boulangerie Lefèvre" required>
+                        <input type="text" id="fete-partner-entreprise" placeholder="Ex: Boulangerie Lefèvre">
                     </div>
                     <div class="form-group">
                         <label for="fete-partner-contact">Nom du Contact</label>
-                        <input type="text" id="fete-partner-contact" placeholder="Ex: Jean Lefèvre" required>
+                        <input type="text" id="fete-partner-contact" placeholder="Ex: Jean Lefèvre">
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label for="fete-partner-suivi">Qui les suit ? (Responsable)</label>
-                        <input type="text" id="fete-partner-suivi" placeholder="Ex: Pierre Martin" required>
+                        <input type="text" id="fete-partner-suivi" placeholder="Ex: Pierre Martin">
                     </div>
                     <div class="form-group">
-                        <label for="fete-partner-montant">Montant Sponsoring (€)</label>
+                        <label for="fete-partner-montant">Montant Sponsoring (€) *</label>
                         <input type="number" id="fete-partner-montant" step="0.01" min="0" placeholder="0.00" required>
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label for="fete-partner-moyen">Moyen de Paiement</label>
-                        <select id="fete-partner-moyen" onchange="toggleChequeFields('fete-partner')" required>
+                        <select id="fete-partner-moyen" onchange="toggleChequeFields('fete-partner')">
                             <option value="Virement">Virement</option>
                             <option value="Chèque">Chèque</option>
                             <option value="Espèces">Espèces</option>
@@ -2272,6 +2272,6 @@
     <!-- Expense Category Hover Popover -->
     <div id="expense-category-popover" class="category-popover"></div>
 
-    <script src="app.js?v=8.6"></script>
+    <script src="app.js?v=8.7"></script>
 </body>
 </html>

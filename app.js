@@ -1,6 +1,6 @@
 // ============================================================================
 // Safe Lucide icon rendering helper
-const APP_VERSION = "8.6";
+const APP_VERSION = "8.7";
 
 function safeCreateIcons() {
     if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
@@ -1300,6 +1300,10 @@ function openModal(id) {
     if (el) {
         if (id === 'modal-transaction') {
             populateSelectOptions();
+            const qteEl = document.getElementById("transaction-quantite");
+            if (qteEl && (!qteEl.value || qteEl.value === '0')) {
+                qteEl.value = '1';
+            }
         }
         el.classList.add("active");
         applyPermissionsToModal(id);
@@ -1310,7 +1314,11 @@ function closeModal(id) {
     document.getElementById(id).classList.remove("active");
     // Clear forms when closing
     if (id === 'modal-adherent') document.getElementById("form-adherent").reset();
-    if (id === 'modal-transaction') document.getElementById("form-transaction").reset();
+    if (id === 'modal-transaction') {
+        document.getElementById("form-transaction").reset();
+        const qteEl = document.getElementById("transaction-quantite");
+        if (qteEl) qteEl.value = '1';
+    }
     if (id === 'modal-manifestation') document.getElementById("form-manifestation").reset();
     if (id === 'modal-produit') document.getElementById("form-produit").reset();
     if (id === 'modal-investissement') document.getElementById("form-investissement").reset();
@@ -2255,7 +2263,9 @@ function renderGeneralReceiptsList() {
 }
 
 function calcTransactionMontant() {
-    const qte = Number(document.getElementById("transaction-quantite").value) || 0;
+    const qteEl = document.getElementById("transaction-quantite");
+    const qteVal = qteEl ? qteEl.value : "";
+    const qte = (qteVal !== "" && !isNaN(Number(qteVal))) ? Number(qteVal) : 1;
     const prix = Number(document.getElementById("transaction-prix").value) || 0;
     document.getElementById("transaction-montant").value = (qte * prix).toFixed(2);
 }
@@ -2267,20 +2277,27 @@ function saveTransaction(e) {
         return;
     }
     const id = document.getElementById("transaction-id").value;
-    const type_flux = document.getElementById("transaction-flux").value;
-    const date_transaction = document.getElementById("transaction-date").value;
-    const categorie_id = document.getElementById("transaction-categorie").value;
-    const moyen_payement = document.getElementById("transaction-moyen").value;
+    const type_flux = document.getElementById("transaction-flux").value || "Dépense";
+    const date_transaction = document.getElementById("transaction-date").value || formatDate(new Date());
+    let categorie_id = document.getElementById("transaction-categorie").value;
+    if (!categorie_id) {
+        const defaultCat = STATE.categories.find(c => c.type === (type_flux === "Recette" ? "Recette" : "Dépense"));
+        categorie_id = defaultCat ? defaultCat.id : "cat-8";
+    }
+    const moyen_payement = document.getElementById("transaction-moyen").value || "Espèces";
     const prix = Number(document.getElementById("transaction-prix").value) || 0;
-    const quantite = Number(document.getElementById("transaction-quantite").value) || 1;
-    const montant = Number(document.getElementById("transaction-montant").value) || 0;
+    const qteVal = document.getElementById("transaction-quantite").value;
+    const quantite = (qteVal !== "" && !isNaN(Number(qteVal))) ? Number(qteVal) : 1;
+    const montantInputVal = document.getElementById("transaction-montant").value;
+    const montant = (montantInputVal !== "" && !isNaN(Number(montantInputVal))) ? Number(montantInputVal) : Number((prix * quantite).toFixed(2));
     const paye = document.getElementById("transaction-paye").checked;
-    const description = document.getElementById("transaction-desc").value;
+    const descVal = document.getElementById("transaction-desc").value.trim();
+    const description = descVal || (type_flux === "Recette" ? "Recette diverse" : "Dépense diverse");
     
-    const adherent_id = document.getElementById("transaction-adherent").value;
-    const manifestation_id = document.getElementById("transaction-manifestation").value;
-    const investissement_id = document.getElementById("transaction-investissement").value;
-    const produit_id = document.getElementById("transaction-produit").value;
+    const adherent_id = document.getElementById("transaction-adherent").value || "";
+    const manifestation_id = document.getElementById("transaction-manifestation").value || "";
+    const investissement_id = document.getElementById("transaction-investissement").value || "";
+    const produit_id = document.getElementById("transaction-produit").value || "";
     const equipement_id = document.getElementById("transaction-equipement") ? document.getElementById("transaction-equipement").value : "";
 
     const num_cheque = document.getElementById("transaction-num-cheque") ? document.getElementById("transaction-num-cheque").value.trim() : "";
@@ -2888,10 +2905,10 @@ function renderManifestationsList() {
         
         listBody.innerHTML += `
             <tr>
-                <td style="font-weight: 500;">${m.nom}</td>
-                <td>${formatDateFrench(new Date(m.date_debut))}</td>
-                <td>${formatDateFrench(new Date(m.date_fin))}</td>
-                <td>${m.lieu}</td>
+                <td style="font-weight: 500;">${m.nom || 'Sans titre'}</td>
+                <td>${m.date_debut ? formatDateFrench(new Date(m.date_debut)) : '-'}</td>
+                <td>${m.date_fin ? formatDateFrench(new Date(m.date_fin)) : '-'}</td>
+                <td>${(m.lieu && m.lieu !== 'undefined') ? m.lieu : '-'}</td>
                 <td style="color: var(--secondary);">${rSum.toFixed(2)} €</td>
                 <td style="color: var(--danger);">${dSum.toFixed(2)} €</td>
                 <td style="${netColor} font-weight: 600;">${net.toFixed(2)} €</td>
@@ -2989,10 +3006,10 @@ function saveManifestation(e) {
         return;
     }
     const id = document.getElementById("manifestation-id").value;
-    const nom = document.getElementById("manifestation-nom").value;
-    const date_debut = document.getElementById("manifestation-debut").value;
-    const date_fin = document.getElementById("manifestation-fin").value;
-    const lieu = document.getElementById("manifestation-lieu").value;
+    const nom = document.getElementById("manifestation-nom").value.trim() || "Nouvelle Manifestation";
+    const date_debut = document.getElementById("manifestation-debut").value || formatDate(new Date());
+    const date_fin = document.getElementById("manifestation-fin").value || date_debut;
+    const lieu = document.getElementById("manifestation-lieu").value.trim() || "";
 
     const data = { nom, date_debut, date_fin, lieu };
 
@@ -5204,9 +5221,9 @@ function saveFeteReceipt(e) {
     }
     const id = document.getElementById("fete-receipt-id").value || "rec-" + Date.now();
     const standId = document.getElementById("fete-receipt-stand-id").value;
-    const date = document.getElementById("fete-receipt-date").value;
+    const date = document.getElementById("fete-receipt-date").value || formatDate(new Date());
     const montant = Number(document.getElementById("fete-receipt-montant").value) || 0;
-    const comment = document.getElementById("fete-receipt-comment").value;
+    const comment = document.getElementById("fete-receipt-comment").value.trim();
     
     const standObj = STATE.feteRuraleStands.find(s => s.id === standId);
     const standNom = standObj ? standObj.nom : "Stand";
@@ -5333,14 +5350,14 @@ function saveFeteExpense(e) {
         return;
     }
     const id = document.getElementById("fete-expense-id").value || "exp-" + Date.now();
-    const description = document.getElementById("fete-expense-desc").value;
-    const date = document.getElementById("fete-expense-date").value;
+    const description = document.getElementById("fete-expense-desc").value.trim() || "Dépense";
+    const date = document.getElementById("fete-expense-date").value || formatDate(new Date());
     const montant = Number(document.getElementById("fete-expense-montant").value) || 0;
-    const feteCat = document.getElementById("fete-expense-cat").value;
-    const moyen = document.getElementById("fete-expense-moyen").value;
-    const payea = document.getElementById("fete-expense-payea").value;
+    const feteCat = document.getElementById("fete-expense-cat").value || "autre";
+    const moyen = document.getElementById("fete-expense-moyen").value || "Espèces";
+    const payea = document.getElementById("fete-expense-payea").value.trim() || "";
     const paye = document.getElementById("fete-expense-paye").checked;
-    const comment = document.getElementById("fete-expense-comment").value;
+    const comment = document.getElementById("fete-expense-comment").value.trim();
     const scan = document.getElementById("fete-expense-scan-data").value;
     const equipement_id = document.getElementById("fete-expense-equipement") ? document.getElementById("fete-expense-equipement").value : "";
     const num_cheque = document.getElementById("fete-expense-num-cheque") ? document.getElementById("fete-expense-num-cheque").value.trim() : "";
@@ -5501,11 +5518,11 @@ function saveFetePartner(e) {
         return;
     }
     const id = document.getElementById("fete-partner-id").value || "part-" + Date.now();
-    const entreprise = document.getElementById("fete-partner-entreprise").value;
-    const contact = document.getElementById("fete-partner-contact").value;
-    const suivi = document.getElementById("fete-partner-suivi").value;
+    const entreprise = document.getElementById("fete-partner-entreprise").value.trim() || "Partenaire";
+    const contact = document.getElementById("fete-partner-contact").value.trim();
+    const suivi = document.getElementById("fete-partner-suivi").value.trim();
     const montant = Number(document.getElementById("fete-partner-montant").value) || 0;
-    const moyen = document.getElementById("fete-partner-moyen").value;
+    const moyen = document.getElementById("fete-partner-moyen").value || "Virement";
     const paye = document.getElementById("fete-partner-paye").checked;
     const logo = document.getElementById("fete-partner-logo-data").value;
     
