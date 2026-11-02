@@ -1,6 +1,6 @@
 // ============================================================================
 // Safe Lucide icon rendering helper
-const APP_VERSION = "8.5";
+const APP_VERSION = "8.6";
 
 function safeCreateIcons() {
     if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
@@ -8336,26 +8336,40 @@ function parseAndImportExcelFile(file) {
     reader.readAsArrayBuffer(file);
 }
 
-async function resetDatabaseForTesting(mode = 'compta') {
+async function resetDatabaseForTesting(mode = 'transactions') {
+    const isTransactionsOnly = mode === 'transactions';
     const isTotal = mode === 'total';
-    const confirmMessage = isTotal ?
-        "🔥 ATTENTION RÉINITIALISATION TOTALE (RAZ TOTALE) :\n\nVoulez-vous vraiment effacer TOUTES les données de la base ?\n• Transactions comptables\n• Manifestations & Stands\n• Adhérents & Cotisations\n• Investissements & Notes\n\nVos paramètres (catégories, profils, équipements partagés) seront conservés.\n\nConfirmer l'effacement TOTAL ?" :
-        "⚠️ ATTENTION RÉINITIALISATION (RAZ COMPTA) :\n\nVoulez-vous effacer uniquement les données de Comptabilité (transactions, investissements) et de Manifestations ?\n\nVos adhérents, catégories et paramètres seront STRICTEMENT CONSERVÉS.\n\nConfirmer l'effacement ?";
+
+    let confirmMessage = "";
+    let collectionsToClear = [];
+    let successMessage = "";
+
+    if (isTransactionsOnly) {
+        confirmMessage = "⚠️ ATTENTION RÉINITIALISATION (RAZ TRANSACTIONS UNIQUEMENT) :\n\nVoulez-vous effacer UNIQUEMENT les transactions comptables ?\n\nVos manifestations (ex: Loto), vos adhérents, investissements, catégories et paramètres seront STRICTEMENT CONSERVÉS.\n\nConfirmer la suppression des transactions ?";
+        collectionsToClear = ["transactions"];
+        successMessage = "🧹 Remise à Zéro des Transactions effectuée !\n\nToutes les transactions comptables ont été effacées.\nVos manifestations, adhérents et paramètres restent 100% intacts.";
+    } else if (isTotal) {
+        confirmMessage = "🔥 ATTENTION RÉINITIALISATION TOTALE (RAZ TOTALE) :\n\nVoulez-vous vraiment effacer TOUTES les données de la base ?\n• Transactions comptables\n• Manifestations & Stands\n• Adhérents & Cotisations\n• Investissements & Notes\n\nVos paramètres (catégories, profils, équipements partagés) seront conservés.\n\nConfirmer l'effacement TOTAL ?";
+        collectionsToClear = ["transactions", "investissements", "manifestations", "feteRuraleStands", "feteRuraleReceipts", "feteRuraleExpenses", "feteRuralePartners", "adherents", "notes", "reservations"];
+        successMessage = "🔥 Remise à Zéro TOTALE effectuée !\n\nToutes les transactions, manifestations, adhérents et notes ont été effacés de la base.\nVos paramètres et catégories restent conservés.";
+    } else {
+        confirmMessage = "⚠️ ATTENTION RÉINITIALISATION (RAZ COMPTA & MANIFESTATIONS) :\n\nVoulez-vous effacer les données de Comptabilité (transactions, investissements) ET de Manifestations ?\n\nVos adhérents, catégories et paramètres seront STRICTEMENT CONSERVÉS.\n\nConfirmer l'effacement ?";
+        collectionsToClear = ["transactions", "investissements", "manifestations", "feteRuraleStands", "feteRuraleReceipts", "feteRuraleExpenses", "feteRuralePartners"];
+        successMessage = "🧹 Remise à Zéro de la Compta et des Manifestations effectuée !\n\nLes transactions, investissements et manifestations ont été effacés.\nTous vos adhérents, profils et paramètres ont été conservés intacts.";
+    }
 
     if (!confirm(confirmMessage)) return;
 
-    const collectionsToClear = isTotal ?
-        ["transactions", "investissements", "manifestations", "feteRuraleStands", "feteRuraleReceipts", "feteRuraleExpenses", "feteRuralePartners", "adherents", "notes", "reservations"] :
-        ["transactions", "investissements", "manifestations", "feteRuraleStands", "feteRuraleReceipts", "feteRuraleExpenses", "feteRuralePartners"];
-
     // 1. Clear Local State in Memory immediately
     STATE.transactions = [];
-    STATE.investissements = [];
-    STATE.manifestations = [];
-    STATE.feteRuraleStands = [];
-    STATE.feteRuraleReceipts = [];
-    STATE.feteRuraleExpenses = [];
-    STATE.feteRuralePartners = [];
+    if (!isTransactionsOnly) {
+        STATE.investissements = [];
+        STATE.manifestations = [];
+        STATE.feteRuraleStands = [];
+        STATE.feteRuraleReceipts = [];
+        STATE.feteRuraleExpenses = [];
+        STATE.feteRuralePartners = [];
+    }
     if (isTotal) {
         STATE.adherents = [];
         STATE.notes = [];
@@ -8402,10 +8416,6 @@ async function resetDatabaseForTesting(mode = 'compta') {
 
     // 3. Refresh UI views
     refreshAllViews();
-
-    const successMessage = isTotal ?
-        "🔥 Remise à Zéro TOTALE effectuée !\n\nToutes les transactions, manifestations, adhérents et notes ont été effacés de la base.\nVos paramètres et catégories restent conservés." :
-        "🧹 Remise à Zéro de la Compta effectuée !\n\nLes données de comptabilité et de manifestations ont été effacées.\nTous vos adhérents, profils et paramètres ont été conservés intacts.";
 
     alert(successMessage);
 }

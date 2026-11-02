@@ -16,19 +16,19 @@
             errDiv.textContent += '\nError: ' + e.message + ' at ' + e.filename + ':' + e.lineno + ':' + e.colno;
         });
     </script>
-    <link rel="stylesheet" href="index.css?v=8.5">
+    <link rel="stylesheet" href="index.css?v=8.6">
     
     <!-- Favicon & PWA Icons -->
-    <link rel="icon" type="image/png" href="logo.png?v=8.5">
-    <link rel="shortcut icon" type="image/png" href="logo.png?v=8.5">
-    <link rel="manifest" href="manifest.json?v=8.5">
-    <link rel="apple-touch-icon" href="logo.png?v=8.5">
+    <link rel="icon" type="image/png" href="logo.png?v=8.6">
+    <link rel="shortcut icon" type="image/png" href="logo.png?v=8.6">
+    <link rel="manifest" href="manifest.json?v=8.6">
+    <link rel="apple-touch-icon" href="logo.png?v=8.6">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js?v=8.5')
+                navigator.serviceWorker.register('sw.js?v=8.6')
                     .then(reg => {
                         console.log('Service Worker registered successfully!', reg);
                         reg.update(); // Force immediate update check on load
@@ -52,7 +52,7 @@
     <!-- SheetJS CDN for Excel (.xlsx) Import/Export -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- Lucide Icons (Local Bundle) -->
-    <script src="lucide.min.js?v=8.5"></script>
+    <script src="lucide.min.js?v=8.6"></script>
     <!-- Supabase JS Client v2 (100% Cloud Backend) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -61,7 +61,7 @@
     <div id="login-screen" style="display: none;">
         <div class="login-box">
             <div class="login-header">
-                <img src="logo.png?v=8.5" alt="Logo" class="login-logo" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px;" id="login-logo-img">
+                <img src="logo.png?v=8.6" alt="Logo" class="login-logo" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px;" id="login-logo-img">
                 <h2>Foyer Rural d'Esnoms au Val</h2>
                 <p>Espace d'Administration Sécurisé</p>
             </div>
@@ -91,7 +91,7 @@
                 <i data-lucide="menu" style="width: 20px; height: 20px;"></i>
             </button>
             <div style="display: flex; align-items: center; gap: 8px;">
-                <img id="mobile-header-logo" src="logo.png?v=8.5" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;" />
+                <img id="mobile-header-logo" src="logo.png?v=8.6" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;" />
                 <span style="font-weight: 700; font-size: 0.95rem; color: var(--text-main);">Foyer Rural</span>
             </div>
             <div style="width: 36px;"></div>
@@ -104,7 +104,7 @@
         <aside class="sidebar">
             <div class="logo-container" style="border-bottom: none; padding-bottom: 0; display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px;">
                 <div class="logo-details" style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
-                    <img id="sidebar-logo" src="logo.png?v=8.5" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
+                    <img id="sidebar-logo" src="logo.png?v=8.6" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
                     <span class="logo-title" style="white-space: nowrap;">Foyer Rural d'Esnoms au Val</span>
                 </div>
                 <!-- Sidebar Toggle Button (Inside Sidebar Logo Container) -->
@@ -999,13 +999,13 @@
                     <!-- Version & Release Info Panel -->
                     <div class="glass-panel" style="grid-column: 1 / -1; display: flex; gap: 24px; align-items: flex-start; padding: 24px;">
                         <div style="background: rgba(99, 102, 241, 0.1); color: var(--primary); padding: 8px 14px; border-radius: 8px; font-weight: 700; font-family: monospace; font-size: 1.1rem; flex-shrink: 0; border: 1px solid rgba(99, 102, 241, 0.2);">
-                            v8.5
+                            v8.6
                         </div>
                         <div style="flex: 1;">
                             <h2 style="margin-top: 0; margin-bottom: 6px; font-size: 1.15rem; font-weight: 600; color: var(--text-main);">Version & Dernières Modifications</h2>
-                            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px; font-weight: 500;">Mise à jour : 1 novembre 2026</div>
+                            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px; font-weight: 500;">Mise à jour : 2 novembre 2026</div>
                             <p style="color: var(--text-muted); margin: 0; font-size: 0.9rem; line-height: 1.5;">
-                                🚀 <strong>Optimisation RAZ & Suppression Supabase Cloud Instantanée (v8.5)</strong> : Remise à Zéro (RAZ Compta & Manifestations / RAZ Totale) ultra-rapide et directe sur les tables PostgreSQL de Supabase Cloud. Suppression immédiate de tous les enregistrements côté serveur sans blocage réseau, suppression par lot optimisée (chunking), et remise à zéro propre de la base pour les réimportations.
+                                🚀 <strong>Bouton Dédié RAZ Transactions Uniquement & Protection Manifestations (v8.6)</strong> : Clarification des options de remise à zéro avec ajout d'un bouton dédié <strong>« RAZ Transactions Uniquement »</strong> qui supprime exclusivement les transactions comptables dans Supabase Cloud tout en préservant à 100% vos manifestations créées (ex: Loto), vos adhérents, catégories, investissements et paramètres.
                             </p>
                         </div>
                     </div>
@@ -1123,10 +1123,13 @@
                             <i data-lucide="flask-conical" style="width: 16px; height: 16px;"></i> 🧪 <strong>Outils de Remise à Zéro (RAZ)</strong> : Effacez les données de test pour repartir sur une base propre.
                         </div>
                         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                            <button type="button" class="btn btn-danger" onclick="resetDatabaseForTesting('compta')" style="font-size: 0.85rem; padding: 8px 16px; font-weight: 700; background: #dc2626;" title="Efface uniquement la compta et les manifestations pour retester vos fichiers Excel">
-                                <i data-lucide="trash-2"></i> 🧹 RAZ Compta & Manifestations
+                            <button type="button" class="btn btn-danger" onclick="resetDatabaseForTesting('transactions')" style="font-size: 0.85rem; padding: 8px 16px; font-weight: 700; background: #dc2626;" title="Efface UNIQUEMENT les transactions comptables. Conserve précieusement vos manifestations, adhérents, investissements et paramètres.">
+                                <i data-lucide="trash-2"></i> 🧹 RAZ Transactions Uniquement
                             </button>
-                            <button type="button" class="btn btn-danger" onclick="resetDatabaseForTesting('total')" style="font-size: 0.85rem; padding: 8px 16px; font-weight: 700; background: #991b1b; border-color: #7f1d1d;" title="Remise à Zéro TOTALE : efface toutes les transactions, manifestations, adhérents et notes">
+                            <button type="button" class="btn btn-secondary" onclick="resetDatabaseForTesting('compta')" style="font-size: 0.85rem; padding: 8px 14px; font-weight: 600;" title="Efface les transactions, investissements et les manifestations">
+                                <i data-lucide="calendar-x"></i> 🎪 RAZ Compta & Manifestations
+                            </button>
+                            <button type="button" class="btn btn-danger" onclick="resetDatabaseForTesting('total')" style="font-size: 0.85rem; padding: 8px 14px; font-weight: 700; background: #991b1b; border-color: #7f1d1d;" title="Remise à Zéro TOTALE : efface toutes les transactions, manifestations, adhérents et notes">
                                 <i data-lucide="alert-triangle"></i> 🔥 RAZ TOTALE de la Base
                             </button>
                         </div>
@@ -2269,6 +2272,6 @@
     <!-- Expense Category Hover Popover -->
     <div id="expense-category-popover" class="category-popover"></div>
 
-    <script src="app.js?v=8.5"></script>
+    <script src="app.js?v=8.6"></script>
 </body>
 </html>
