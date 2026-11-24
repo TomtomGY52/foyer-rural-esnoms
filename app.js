@@ -1,6 +1,6 @@
 // ============================================================================
 // Safe Lucide icon rendering helper
-const APP_VERSION = "8.9";
+const APP_VERSION = "8.10";
 
 function safeCreateIcons() {
     if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
@@ -73,7 +73,8 @@ let SORTS = {
     manifestations: { field: 'date_debut', direction: 'asc' },
     produits: { field: 'nom_boisson', direction: 'asc' },
     investissements: { field: 'date_acquisition', direction: 'desc' },
-    manifestationExpenses: { field: 'date', direction: 'desc' }
+    manifestationExpenses: { field: 'date', direction: 'desc' },
+    adherents: { field: 'nom', direction: 'asc' }
 };
 
 function toggleSort(section, field) {
@@ -94,6 +95,7 @@ function toggleSort(section, field) {
     if (section === 'produits') renderProduitsList();
     if (section === 'investissements') renderInvestissementsList();
     if (section === 'manifestationExpenses') renderFeteRurale();
+    if (section === 'adherents') renderAdherentsList();
 }
 
 function updateSortIndicators(section) {
@@ -1103,6 +1105,7 @@ function refreshAllViews() {
     updateSortIndicators('manifestations');
     updateSortIndicators('produits');
     updateSortIndicators('investissements');
+    updateSortIndicators('adherents');
     
     // Refresh Settings Categories editor
     renderSettingsCategoriesList();
@@ -1186,6 +1189,8 @@ function setupNavigation() {
             // Special initialization on tab display
             if (tabId === "dashboard") {
                 renderDashboard();
+            } else if (tabId === "adherents") {
+                renderAdherentsList();
             } else if (tabId === "tennis") {
                 renderTennisCalendar();
             } else if (tabId === "bilan") {
@@ -1570,15 +1575,26 @@ function renderAdherentsList() {
     if (!listBody) return;
     listBody.innerHTML = "";
 
-    const searchVal = document.getElementById("search-adherent").value.toLowerCase();
-    const filterCotis = document.getElementById("filter-cotisation").value;
+    const searchInput = document.getElementById("search-adherent");
+    const searchVal = searchInput ? searchInput.value.toLowerCase().trim() : "";
+    const filterCotisEl = document.getElementById("filter-cotisation");
+    const filterCotis = filterCotisEl ? filterCotisEl.value : "all";
 
     const filtered = STATE.adherents.filter(a => {
-        const matchesSearch = (
-            (a.nom || "").toLowerCase().includes(searchVal) || 
-            (a.prenom || "").toLowerCase().includes(searchVal) || 
-            (a.email || "").toLowerCase().includes(searchVal) ||
-            (a.numero_adherent || "").toLowerCase().includes(searchVal)
+        const nom = (a.nom || "").toLowerCase();
+        const prenom = (a.prenom || "").toLowerCase();
+        const email = (a.email || "").toLowerCase();
+        const num = (a.numero_adherent || "").toLowerCase();
+        const full1 = `${nom} ${prenom}`;
+        const full2 = `${prenom} ${nom}`;
+
+        const matchesSearch = !searchVal || (
+            nom.includes(searchVal) || 
+            prenom.includes(searchVal) || 
+            email.includes(searchVal) ||
+            num.includes(searchVal) ||
+            full1.includes(searchVal) ||
+            full2.includes(searchVal)
         );
         let matchesFilter = true;
         const upToDate = isAdherentCotisationUpToDate(a);
@@ -1588,13 +1604,65 @@ function renderAdherentsList() {
         return matchesSearch && matchesFilter;
     });
 
+    // Dynamic sorting
+    const sortField = (SORTS.adherents && SORTS.adherents.field) ? SORTS.adherents.field : 'nom';
+    const sortDirection = (SORTS.adherents && SORTS.adherents.direction === 'desc') ? -1 : 1;
+
+    filtered.sort((a, b) => {
+        if (sortField === 'nom') {
+            const nomA = (a.nom || "").trim();
+            const nomB = (b.nom || "").trim();
+            if (!nomA && nomB) return 1;
+            if (nomA && !nomB) return -1;
+            const compNom = nomA.localeCompare(nomB, 'fr', { sensitivity: 'base' });
+            if (compNom !== 0) return compNom * sortDirection;
+            const prenomA = (a.prenom || "").trim();
+            const prenomB = (b.prenom || "").trim();
+            return prenomA.localeCompare(prenomB, 'fr', { sensitivity: 'base' }) * sortDirection;
+        } else if (sortField === 'numero_adherent') {
+            const numA = (a.numero_adherent || "").trim();
+            const numB = (b.numero_adherent || "").trim();
+            if (!numA && numB) return 1;
+            if (numA && !numB) return -1;
+            return numA.localeCompare(numB, 'fr', { numeric: true, sensitivity: 'base' }) * sortDirection;
+        } else if (sortField === 'email') {
+            const emailA = (a.email || "").trim().toLowerCase();
+            const emailB = (b.email || "").trim().toLowerCase();
+            if (!emailA && emailB) return 1;
+            if (emailA && !emailB) return -1;
+            return emailA.localeCompare(emailB, 'fr', { sensitivity: 'base' }) * sortDirection;
+        } else if (sortField === 'date_adhesion') {
+            const timeA = a.date_adhesion ? new Date(a.date_adhesion).getTime() : 0;
+            const timeB = b.date_adhesion ? new Date(b.date_adhesion).getTime() : 0;
+            if (timeA !== timeB) return (timeA - timeB) * sortDirection;
+            return (a.nom || "").trim().localeCompare((b.nom || "").trim(), 'fr', { sensitivity: 'base' }) * sortDirection;
+        } else if (sortField === 'cotisation') {
+            const cotisA = isAdherentCotisationUpToDate(a) ? 1 : 0;
+            const cotisB = isAdherentCotisationUpToDate(b) ? 1 : 0;
+            if (cotisA !== cotisB) return (cotisA - cotisB) * sortDirection;
+            return (a.nom || "").trim().localeCompare((b.nom || "").trim(), 'fr', { sensitivity: 'base' }) * sortDirection;
+        } else if (sortField === 'gestanet') {
+            const isGestA = (a.gestanet_periods && a.gestanet_periods.includes(STATE.currentPeriod)) ? 1 : 0;
+            const isGestB = (b.gestanet_periods && b.gestanet_periods.includes(STATE.currentPeriod)) ? 1 : 0;
+            if (isGestA !== isGestB) return (isGestA - isGestB) * sortDirection;
+            return (a.nom || "").trim().localeCompare((b.nom || "").trim(), 'fr', { sensitivity: 'base' }) * sortDirection;
+        } else {
+            const valA = (a[sortField] || "").toString().toLowerCase();
+            const valB = (b[sortField] || "").toString().toLowerCase();
+            if (valA < valB) return -1 * sortDirection;
+            if (valA > valB) return 1 * sortDirection;
+            return 0;
+        }
+    });
+
     if (filtered.length === 0) {
         listBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 32px;">Aucun adhérent ne correspond aux critères</td></tr>`;
+        updateSortIndicators('adherents');
         return;
     }
 
     filtered.forEach(a => {
-        const dateStr = formatDateFrench(new Date(a.date_adhesion));
+        const dateStr = a.date_adhesion ? formatDateFrench(new Date(a.date_adhesion)) : '--';
         const upToDate = isAdherentCotisationUpToDate(a);
         const badgeClass = upToDate ? 'badge-success' : 'badge-danger';
         const badgeLabel = upToDate ? 'À Jour' : 'En retard';
@@ -1603,19 +1671,25 @@ function renderAdherentsList() {
         const gestanetBadgeClass = isGestanet ? 'badge-success' : 'badge-danger';
         const gestanetBadgeLabel = isGestanet ? 'À Jour' : 'Non à Jour';
         
+        const nomFormatted = (a.nom || '').trim();
+        const prenomFormatted = (a.prenom || '').trim();
+        const displayName = (nomFormatted || prenomFormatted)
+            ? `<span style="font-weight: 600;">${nomFormatted.toUpperCase()}</span> ${prenomFormatted}`.trim()
+            : '--';
+
         listBody.innerHTML += `
             <tr>
                 <td style="font-weight: 600; color: var(--text-muted); font-family: monospace;">${a.numero_adherent || '--'}</td>
-                <td style="font-weight: 500;">${a.prenom} ${a.nom}</td>
-                <td>${a.email}</td>
+                <td style="font-weight: 500;">${displayName}</td>
+                <td>${a.email || '--'}</td>
                 <td>${dateStr}</td>
                 <td>
-                    <span class="badge ${badgeClass}" style="cursor: pointer;" onclick="toggleAdherentCotisation('${a.id}')">
+                    <span class="badge ${badgeClass}" style="cursor: pointer;" onclick="toggleAdherentCotisation('${a.id}')" title="Cliquer pour basculer le statut de cotisation">
                         ${badgeLabel}
                     </span>
                 </td>
                 <td>
-                    <span class="badge ${gestanetBadgeClass}" style="cursor: pointer;" onclick="toggleAdherentGestanet('${a.id}')">
+                    <span class="badge ${gestanetBadgeClass}" style="cursor: pointer;" onclick="toggleAdherentGestanet('${a.id}')" title="Cliquer pour basculer le statut Gestanet">
                         ${gestanetBadgeLabel}
                     </span>
                 </td>
@@ -1637,6 +1711,7 @@ function renderAdherentsList() {
     });
     
     safeCreateIcons();
+    updateSortIndicators('adherents');
 }
 
 function saveAdherent(e) {

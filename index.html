@@ -16,19 +16,19 @@
             errDiv.textContent += '\nError: ' + e.message + ' at ' + e.filename + ':' + e.lineno + ':' + e.colno;
         });
     </script>
-    <link rel="stylesheet" href="index.css?v=8.9">
+    <link rel="stylesheet" href="index.css?v=8.10">
     
     <!-- Favicon & PWA Icons -->
-    <link rel="icon" type="image/png" href="logo.png?v=8.9">
-    <link rel="shortcut icon" type="image/png" href="logo.png?v=8.9">
-    <link rel="manifest" href="manifest.json?v=8.9">
-    <link rel="apple-touch-icon" href="logo.png?v=8.9">
+    <link rel="icon" type="image/png" href="logo.png?v=8.10">
+    <link rel="shortcut icon" type="image/png" href="logo.png?v=8.10">
+    <link rel="manifest" href="manifest.json?v=8.10">
+    <link rel="apple-touch-icon" href="logo.png?v=8.10">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js?v=8.9')
+                navigator.serviceWorker.register('sw.js?v=8.10')
                     .then(reg => {
                         console.log('Service Worker registered successfully!', reg);
                         reg.update(); // Force immediate update check on load
@@ -52,7 +52,7 @@
     <!-- SheetJS CDN for Excel (.xlsx) Import/Export -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- Lucide Icons (Local Bundle) -->
-    <script src="lucide.min.js?v=8.9"></script>
+    <script src="lucide.min.js?v=8.10"></script>
     <!-- Supabase JS Client v2 (100% Cloud Backend) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -61,7 +61,7 @@
     <div id="login-screen" style="display: none;">
         <div class="login-box">
             <div class="login-header">
-                <img src="logo.png?v=8.9" alt="Logo" class="login-logo" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px;" id="login-logo-img">
+                <img src="logo.png?v=8.10" alt="Logo" class="login-logo" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px;" id="login-logo-img">
                 <h2>Foyer Rural d'Esnoms au Val</h2>
                 <p>Espace d'Administration Sécurisé</p>
             </div>
@@ -91,7 +91,7 @@
                 <i data-lucide="menu" style="width: 20px; height: 20px;"></i>
             </button>
             <div style="display: flex; align-items: center; gap: 8px;">
-                <img id="mobile-header-logo" src="logo.png?v=8.9" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;" />
+                <img id="mobile-header-logo" src="logo.png?v=8.10" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;" />
                 <span style="font-weight: 700; font-size: 0.95rem; color: var(--text-main);">Foyer Rural</span>
             </div>
             <div style="width: 36px;"></div>
@@ -104,7 +104,7 @@
         <aside class="sidebar">
             <div class="logo-container" style="border-bottom: none; padding-bottom: 0; display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px;">
                 <div class="logo-details" style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
-                    <img id="sidebar-logo" src="logo.png?v=8.9" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
+                    <img id="sidebar-logo" src="logo.png?v=8.10" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
                     <span class="logo-title" style="white-space: nowrap;">Foyer Rural d'Esnoms au Val</span>
                 </div>
                 <!-- Sidebar Toggle Button (Inside Sidebar Logo Container) -->
@@ -278,12 +278,12 @@
                         <table>
                             <thead>
                                 <tr>
-                                    <th>N° Adhérent</th>
-                                    <th>Nom Complet</th>
-                                    <th>Email</th>
-                                    <th>Date d'Adhésion</th>
-                                    <th>Cotisation</th>
-                                    <th>Gestanet</th>
+                                    <th data-sort-adherents="numero_adherent" data-text="N° Adhérent" onclick="toggleSort('adherents', 'numero_adherent')" style="cursor: pointer; user-select: none;" title="Trier par N° d'Adhérent">N° Adhérent</th>
+                                    <th data-sort-adherents="nom" data-text="Nom" onclick="toggleSort('adherents', 'nom')" style="cursor: pointer; user-select: none;" title="Trier par Nom (ordre alphabétique)">Nom</th>
+                                    <th data-sort-adherents="email" data-text="Email" onclick="toggleSort('adherents', 'email')" style="cursor: pointer; user-select: none;" title="Trier par Email">Email</th>
+                                    <th data-sort-adherents="date_adhesion" data-text="Date d'Adhésion" onclick="toggleSort('adherents', 'date_adhesion')" style="cursor: pointer; user-select: none;" title="Trier par Date d'Adhésion">Date d'Adhésion</th>
+                                    <th data-sort-adherents="cotisation" data-text="Cotisation" onclick="toggleSort('adherents', 'cotisation')" style="cursor: pointer; user-select: none;" title="Trier par Statut de Cotisation">Cotisation</th>
+                                    <th data-sort-adherents="gestanet" data-text="Gestanet" onclick="toggleSort('adherents', 'gestanet')" style="cursor: pointer; user-select: none;" title="Trier par Statut Gestanet">Gestanet</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -999,13 +999,13 @@
                     <!-- Version & Release Info Panel -->
                     <div class="glass-panel" style="grid-column: 1 / -1; display: flex; gap: 24px; align-items: flex-start; padding: 24px;">
                         <div style="background: rgba(99, 102, 241, 0.1); color: var(--primary); padding: 8px 14px; border-radius: 8px; font-weight: 700; font-family: monospace; font-size: 1.1rem; flex-shrink: 0; border: 1px solid rgba(99, 102, 241, 0.2);">
-                            v8.9
+                            v8.10
                         </div>
                         <div style="flex: 1;">
                             <h2 style="margin-top: 0; margin-bottom: 6px; font-size: 1.15rem; font-weight: 600; color: var(--text-main);">Version & Dernières Modifications</h2>
-                            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px; font-weight: 500;">Mise à jour : 2 novembre 2026</div>
+                            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px; font-weight: 500;">Mise à jour : 24 novembre 2026</div>
                             <p style="color: var(--text-muted); margin: 0; font-size: 0.9rem; line-height: 1.5;">
-                                🚀 <strong>Synchronisation Totale des Recettes & Bilans des Manifestations (v8.9)</strong> : Le tableau supérieur « Liste des Événements » et le bilan financier calculent désormais l'ensemble réel des recettes de manifestations (relèves de caisse des stands, sponsors) et des dépenses (fonds de caisse des stands, achats de l'événement). Il affiche ainsi exactement les mêmes chiffres (3 615 € de recettes, 1 298 € de dépenses, +2 317 € de bénéfice net) que le bilan détaillé.
+                                🚀 <strong>Tri Dynamique de la Liste des Adhérents (v8.10)</strong> : La liste des membres et adhérents peut désormais être triée dynamiquement par un simple clic sur les en-têtes de colonnes (Nom par ordre alphabétique A-Z / Z-A, N° Adhérent, Email, Date d'Adhésion, Statut de Cotisation et Gestanet), avec indicateurs visuels de direction (▲ / ▼).
                             </p>
                         </div>
                     </div>
@@ -2272,6 +2272,6 @@
     <!-- Expense Category Hover Popover -->
     <div id="expense-category-popover" class="category-popover"></div>
 
-    <script src="app.js?v=8.9"></script>
+    <script src="app.js?v=8.10"></script>
 </body>
 </html>
