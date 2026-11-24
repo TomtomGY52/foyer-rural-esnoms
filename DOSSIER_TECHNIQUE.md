@@ -9,7 +9,7 @@
 
 - **Nom de l'application** : Foyer Rural d'Esnoms au Val
 - **Objet** : Application web complète de gestion associative (adhérents, comptabilité générale, bilans annuels, gestion analytique des manifestations/fêtes, réservations tennis, stocks buvette/réserve, investissements, équipements partagés).
-- **Version actuelle** : **`v8.11`** (datée du *24 novembre 2026*).
+- **Version actuelle** : **`v8.12`** (datée du *24 novembre 2026*).
 - **Hébergement & URL de production** : [https://foyer-rural-esnoms.web.app](https://foyer-rural-esnoms.web.app) (Firebase Hosting).
 - **Nature du projet** : PWA (Progressive Web App) "Single Page Application", installable sur mobile/ordinateur, synchronisée en temps réel avec le Cloud et dotée d'un Service Worker offline.
 

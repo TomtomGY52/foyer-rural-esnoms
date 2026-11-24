@@ -1,6 +1,6 @@
 // ============================================================================
 // Safe Lucide icon rendering helper
-const APP_VERSION = "8.11";
+const APP_VERSION = "8.12";
 
 function safeCreateIcons() {
     if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
@@ -1383,13 +1383,26 @@ function renderDashboard() {
     } else {
         sortedTx.forEach(t => {
             const dateStr = formatDateFrench(new Date(t.date_transaction));
-            const isReallocated = t.type_flux === "Dépense" && !!t.manifestation_id;
+            let targetManifId = t.manifestation_id;
+            if (!targetManifId) {
+                const linkedExp = (STATE.feteRuraleExpenses || []).find(e => e.transaction_id === t.id || e.reserve_transaction_id === t.id);
+                if (linkedExp && linkedExp.manifestation_id) targetManifId = linkedExp.manifestation_id;
+            }
+            const isReallocated = t.type_flux === "Dépense" && (!!targetManifId || Number(t.montant) < 0);
             const amountColor = (t.type_flux === "Recette" || isReallocated) ? "color: #059669;" : "color: var(--danger);";
-            const displayAmt = isReallocated ? `-${Number(t.montant).toFixed(2)} €` : `${t.type_flux === "Recette" ? "+" : "-"} ${Number(t.montant).toFixed(2)} €`;
+            const absAmt = Math.abs(Number(t.montant)).toFixed(2);
+            const displayAmt = isReallocated ? `-${absAmt} €` : `${t.type_flux === "Recette" ? "+" : "-"} ${absAmt} €`;
+            const cleanDesc = (t.description || "").replace(/^\[Déduction Réserve\]\s*/i, "").trim();
+            let manifBadge = "";
+            if (targetManifId) {
+                const m = (STATE.manifestations || []).find(man => man.id === targetManifId);
+                const mName = m ? m.nom : "Manifestation";
+                manifBadge = ` <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.7rem; font-weight: 600;">🎪 ${mName} (Déduit)</span>`;
+            }
             recentTxBody.innerHTML += `
                 <tr>
                     <td>${dateStr}</td>
-                    <td>${t.description}</td>
+                    <td>${cleanDesc}${manifBadge}</td>
                     <td style="${amountColor} font-weight: 600;">${displayAmt}</td>
                 </tr>
             `;
@@ -2153,13 +2166,21 @@ function renderGeneralExpensesList() {
         const payeBadgeClass = t.paye ? "badge-success" : "badge-warning";
         const payeLabel = t.paye ? "Réglé" : "En attente";
 
-        const isReallocated = !!t.manifestation_id;
+        let targetManifId = t.manifestation_id;
+        if (!targetManifId) {
+            const linkedExp = (STATE.feteRuraleExpenses || []).find(e => e.transaction_id === t.id || e.reserve_transaction_id === t.id);
+            if (linkedExp && linkedExp.manifestation_id) {
+                targetManifId = linkedExp.manifestation_id;
+            }
+        }
+
+        const isReallocated = !!targetManifId;
 
         let manifBadge = "";
         if (isReallocated) {
-            const m = (STATE.manifestations || []).find(man => man.id === t.manifestation_id);
+            const m = (STATE.manifestations || []).find(man => man.id === targetManifId);
             const mName = m ? m.nom : "Manifestation";
-            manifBadge = `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); margin-left: 6px; font-size: 0.75rem; font-weight: 600;" title="Réaffecté à la fête : déduit des dépenses générales">🎪 ${mName} (Déduit)</span>`;
+            manifBadge = `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); margin-left: 6px; font-size: 0.75rem; font-weight: 600;" title="Dépense liée à la manifestation : déduit des dépenses générales">🎪 ${mName} (Déduit)</span>`;
         }
 
         let eqBadge = "";
@@ -2184,7 +2205,7 @@ function renderGeneralExpensesList() {
         }
 
         let reserveBadge = "";
-        if (t.moyen_payement === "Réserve") {
+        if (t.moyen_payement === "Réserve" && !targetManifId) {
             reserveBadge = `<span class="badge" style="background: rgba(99, 102, 241, 0.15); color: var(--primary); border: 1px solid rgba(99, 102, 241, 0.3); margin-left: 6px; font-size: 0.75rem; font-weight: 600;">📦 Réserve (Déduit)</span>`;
         }
 
@@ -2193,11 +2214,13 @@ function renderGeneralExpensesList() {
         const amountVal = Math.abs(Number(t.montant));
         const amountStr = isNegative ? `-${amountVal.toFixed(2)} €` : `${amountVal.toFixed(2)} €`;
 
+        const cleanDesc = (t.description || "").replace(/^\[Déduction Réserve\]\s*/i, "").trim();
+
         listBody.innerHTML += `
             <tr>
                 <td>${dateStr}</td>
                 <td>${catLabel}</td>
-                <td style="font-weight: 500;">${t.description}${manifBadge}${eqBadge}${chequeBadge}${reserveBadge}</td>
+                <td style="font-weight: 500;">${cleanDesc}${manifBadge}${eqBadge}${chequeBadge}${reserveBadge}</td>
                 <td style="font-weight: 600; text-align: right; ${amountStyle}">${amountStr}</td>
                 <td>
                     <span class="badge ${payeBadgeClass}" style="cursor: pointer;" onclick="toggleTransactionPaid('${t.id}')" title="Changer statut de paiement">
@@ -2367,14 +2390,14 @@ function saveTransaction(e) {
         categorie_id = defaultCat ? defaultCat.id : "cat-8";
     }
     const moyen_payement = document.getElementById("transaction-moyen").value || "Espèces";
-    const prix = Number(document.getElementById("transaction-prix").value) || 0;
+    let prix = Number(document.getElementById("transaction-prix").value) || 0;
     const qteVal = document.getElementById("transaction-quantite").value;
     const quantite = (qteVal !== "" && !isNaN(Number(qteVal))) ? Number(qteVal) : 1;
     const montantInputVal = document.getElementById("transaction-montant").value;
-    const montant = (montantInputVal !== "" && !isNaN(Number(montantInputVal))) ? Number(montantInputVal) : Number((prix * quantite).toFixed(2));
+    let montant = (montantInputVal !== "" && !isNaN(Number(montantInputVal))) ? Number(montantInputVal) : Number((prix * quantite).toFixed(2));
     const paye = document.getElementById("transaction-paye").checked;
     const descVal = document.getElementById("transaction-desc").value.trim();
-    const description = descVal || (type_flux === "Recette" ? "Recette diverse" : "Dépense diverse");
+    const description = (descVal || (type_flux === "Recette" ? "Recette diverse" : "Dépense diverse")).replace(/^\[Déduction Réserve\]\s*/i, "").trim();
     
     const adherent_id = document.getElementById("transaction-adherent").value || "";
     const manifestation_id = document.getElementById("transaction-manifestation").value || "";
@@ -2385,6 +2408,15 @@ function saveTransaction(e) {
     const num_cheque = document.getElementById("transaction-num-cheque") ? document.getElementById("transaction-num-cheque").value.trim() : "";
     const cheque_encaisse = document.getElementById("transaction-cheque-encaisse") ? document.getElementById("transaction-cheque-encaisse").checked : false;
 
+    // Si dépense imputée à une manifestation, comptabilisée en négatif (déduction des dépenses générales)
+    if (type_flux === "Dépense" && manifestation_id) {
+        montant = -Math.abs(montant);
+        prix = -Math.abs(prix);
+    } else {
+        montant = Math.abs(montant);
+        prix = Math.abs(prix);
+    }
+
     const data = {
         type_flux, date_transaction, categorie_id, moyen_payement,
         prix, quantite, montant, paye, description,
@@ -2392,10 +2424,42 @@ function saveTransaction(e) {
         num_cheque, cheque_encaisse
     };
 
+    const syncLinkedFeteExpense = (txId) => {
+        if (type_flux === "Dépense" && manifestation_id) {
+            const existingExp = (STATE.feteRuraleExpenses || []).find(x => x.transaction_id === txId || x.reserve_transaction_id === txId);
+            const expId = existingExp ? existingExp.id : ("exp-" + txId);
+            const expObj = {
+                id: expId,
+                description: description,
+                date: date_transaction,
+                montant: Math.abs(montant),
+                paye: paye,
+                moyen_payement: (moyen_payement === "Réserve" ? "Réserve" : (existingExp ? (existingExp.moyen_payement || "Réserve") : "Réserve")),
+                paye_a: existingExp ? (existingExp.paye_a || "Comptabilité générale") : "Comptabilité générale",
+                categorie: categorie_id,
+                commentaire: existingExp ? (existingExp.commentaire || "") : "",
+                scan: existingExp ? (existingExp.scan || "") : "",
+                manifestation_id: manifestation_id,
+                equipement_id: equipement_id,
+                num_cheque: num_cheque,
+                cheque_encaisse: cheque_encaisse,
+                transaction_id: txId,
+                reserve_transaction_id: txId
+            };
+            saveFeteData("feteRuraleExpenses", expObj);
+        } else if (id) {
+            const prevLinkedExp = (STATE.feteRuraleExpenses || []).find(x => x.transaction_id === id || x.reserve_transaction_id === id);
+            if (prevLinkedExp) {
+                deleteFeteData("feteRuraleExpenses", prevLinkedExp.id);
+            }
+        }
+    };
+
     if (isCloudDb()) {
         if (id) {
             db.collection("transactions").doc(id).update(data)
                 .then(() => {
+                    syncLinkedFeteExpense(id);
                     adjustStockIfProductLinked(produit_id, quantite, type_flux, id);
                     closeModal("modal-transaction");
                     refreshAllViews();
@@ -2404,6 +2468,7 @@ function saveTransaction(e) {
         } else {
             db.collection("transactions").add(data)
                 .then((docRef) => {
+                    syncLinkedFeteExpense(docRef.id);
                     adjustStockIfProductLinked(produit_id, quantite, type_flux, docRef.id);
                     closeModal("modal-transaction");
                     refreshAllViews();
@@ -2414,9 +2479,11 @@ function saveTransaction(e) {
         if (id) {
             const idx = STATE.transactions.findIndex(t => t.id === id);
             STATE.transactions[idx] = { id, ...data };
+            syncLinkedFeteExpense(id);
         } else {
             const newId = "tx-" + Date.now();
             STATE.transactions.push({ id: newId, ...data });
+            syncLinkedFeteExpense(newId);
             adjustStockIfProductLinked(produit_id, quantite, type_flux, newId);
         }
         saveState();
@@ -2459,11 +2526,11 @@ function editTransaction(id) {
     document.getElementById("transaction-id").value = t.id;
     document.getElementById("transaction-date").value = t.date_transaction;
     document.getElementById("transaction-moyen").value = t.moyen_payement || "Espèces";
-    document.getElementById("transaction-prix").value = t.prix;
-    document.getElementById("transaction-quantite").value = t.quantite;
-    document.getElementById("transaction-montant").value = t.montant;
+    document.getElementById("transaction-prix").value = Math.abs(t.prix || 0);
+    document.getElementById("transaction-quantite").value = t.quantite || 1;
+    document.getElementById("transaction-montant").value = Math.abs(t.montant || 0);
     document.getElementById("transaction-paye").checked = t.paye;
-    document.getElementById("transaction-desc").value = t.description;
+    document.getElementById("transaction-desc").value = (t.description || "").replace(/^\[Déduction Réserve\]\s*/i, "").trim();
     
     if (document.getElementById("transaction-num-cheque")) {
         document.getElementById("transaction-num-cheque").value = t.num_cheque || "";
@@ -2571,6 +2638,12 @@ function deleteTransaction(id) {
     }
     if (!confirm("Voulez-vous vraiment supprimer cette transaction ?")) return;
 
+    // Delete any linked manifestation expense
+    const linkedExp = (STATE.feteRuraleExpenses || []).find(e => e.transaction_id === id || e.reserve_transaction_id === id);
+    if (linkedExp) {
+        deleteFeteData("feteRuraleExpenses", linkedExp.id);
+    }
+
     if (isCloudDb()) {
         db.collection("transactions").doc(id).delete()
             .catch(err => alert("Erreur de suppression: " + err));
@@ -2643,8 +2716,8 @@ function renderBilanAnnuel() {
             const cat = STATE.categories.find(c => c.id === t.categorie_id);
             const catName = cat ? cat.libelle : "Autre";
 
-            if (!t.manifestation_id) {
-                // General accounting only
+            if (!t.manifestation_id || amount < 0) {
+                // General accounting only (including negative deductions reallocated to manifestations)
                 if (t.type_flux === "Recette") {
                     recTotal += amount;
                     catRecTotals[catName] = (catRecTotals[catName] || 0) + amount;
@@ -2952,14 +3025,17 @@ function getManifestationFinances(manifId) {
 
     // 5. Manifestation specific expenses
     const expenses = (STATE.feteRuraleExpenses || []).filter(e => e.manifestation_id === manifId);
+    const countedTxIds = new Set();
     expenses.forEach(e => {
-        depenses += Number(e.montant) || 0;
+        depenses += Math.abs(Number(e.montant)) || 0;
+        if (e.transaction_id) countedTxIds.add(e.transaction_id);
+        if (e.reserve_transaction_id) countedTxIds.add(e.reserve_transaction_id);
     });
 
-    // 6. Other expenses from general transactions linked to this manifestation (excluding negative reserve deductions)
+    // 6. Other expenses from general transactions linked to this manifestation not already counted
     (STATE.transactions || []).forEach(t => {
-        if (t.manifestation_id === manifId && t.type_flux === "Dépense" && t.paye && t.moyen_payement !== 'Réserve' && Number(t.montant) > 0) {
-            depenses += Number(t.montant) || 0;
+        if (t.manifestation_id === manifId && t.type_flux === "Dépense" && t.paye && !countedTxIds.has(t.id)) {
+            depenses += Math.abs(Number(t.montant)) || 0;
         }
     });
 
@@ -5456,13 +5532,21 @@ function openManifestationExpenseModalDirectly(id) {
 }
 
 function editFeteExpense(id) {
-    const exp = STATE.feteRuraleExpenses.find(e => e.id === id);
+    let exp = STATE.feteRuraleExpenses.find(e => e.id === id);
+    if (!exp && id.startsWith("tx-exp-")) {
+        const txId = id.replace("tx-exp-", "");
+        const t = STATE.transactions.find(tx => tx.id === txId);
+        if (t) {
+            editTransaction(t.id);
+            return;
+        }
+    }
     if (!exp) return;
     
     document.getElementById("fete-expense-id").value = exp.id;
-    document.getElementById("fete-expense-desc").value = exp.description;
+    document.getElementById("fete-expense-desc").value = (exp.description || "").replace(/^\[Déduction Réserve\]\s*/i, "").trim();
     document.getElementById("fete-expense-date").value = exp.date;
-    document.getElementById("fete-expense-montant").value = exp.montant;
+    document.getElementById("fete-expense-montant").value = Math.abs(Number(exp.montant) || 0);
     let targetCatId = exp.categorie;
     if (!STATE.categories.some(c => c.id === targetCatId)) {
         const found = STATE.categories.find(c => c.type === "Manifestation" && c.libelle.toLowerCase() === (exp.categorie || "").toLowerCase());
@@ -5523,7 +5607,7 @@ function saveFeteExpense(e) {
         // Seules les dépenses dont le moyen est "Réserve" créent une transaction comptable, et en négatif (-montant)
         const reserveTxData = {
             date,
-            description: `[Déduction Réserve] ${description}`,
+            description: description,
             type_flux: 'Dépense',
             montant: -Math.abs(montant),
             prix: -Math.abs(montant),
@@ -5531,8 +5615,8 @@ function saveFeteExpense(e) {
             paye: true,
             moyen_payement: 'Réserve',
             categorie_id: feteCat,
-            manifestation_id: "",
-            equipement_id: ""
+            manifestation_id: activeManifestationId,
+            equipement_id: equipement_id
         };
 
         syncFeteFinancialToTransactions(existingTxId, reserveTxData, (newTxId) => {
@@ -5603,6 +5687,11 @@ function saveFeteExpense(e) {
 function deleteFeteExpense(id) {
     if (!hasWritePermission("manifestations")) {
         alert("Action non autorisée (lecture seule).");
+        return;
+    }
+    if (id.startsWith("tx-exp-")) {
+        const txId = id.replace("tx-exp-", "");
+        deleteTransaction(txId);
         return;
     }
     const exp = STATE.feteRuraleExpenses.find(e => e.id === id);
@@ -5808,8 +5897,31 @@ function renderFeteRurale() {
     // Filter local collections for the active manifestation
     const stands = (STATE.feteRuraleStands || []).filter(s => s.manifestation_id === activeManifestationId);
     const receipts = (STATE.feteRuraleReceipts || []).filter(r => r.manifestation_id === activeManifestationId);
-    const expenses = (STATE.feteRuraleExpenses || []).filter(e => e.manifestation_id === activeManifestationId);
+    let expenses = (STATE.feteRuraleExpenses || []).filter(e => e.manifestation_id === activeManifestationId);
     const partners = (STATE.feteRuralePartners || []).filter(p => p.manifestation_id === activeManifestationId);
+
+    // Complement expenses with any general transaction linked to this manifestation not yet present in expenses
+    const existingTxIds = new Set(expenses.map(e => e.transaction_id || e.reserve_transaction_id).filter(Boolean));
+    (STATE.transactions || []).forEach(t => {
+        if (t.manifestation_id === activeManifestationId && t.type_flux === "Dépense" && !existingTxIds.has(t.id)) {
+            const cleanDesc = (t.description || "").replace(/^\[Déduction Réserve\]\s*/i, "").trim();
+            expenses.push({
+                id: "tx-exp-" + t.id,
+                description: cleanDesc,
+                date: t.date_transaction,
+                montant: Math.abs(Number(t.montant)),
+                paye: t.paye,
+                moyen_payement: t.moyen_payement || "Réserve",
+                paye_a: "Comptabilité générale",
+                categorie: t.categorie_id,
+                transaction_id: t.id,
+                reserve_transaction_id: t.id,
+                manifestation_id: activeManifestationId,
+                num_cheque: t.num_cheque || "",
+                cheque_encaisse: t.cheque_encaisse || false
+            });
+        }
+    });
 
     // A. Calculate global manifestation dashboard metrics
     let totalRecList = {};
@@ -5891,35 +6003,37 @@ function renderFeteRurale() {
     expenses.forEach(e => {
         const cat = STATE.categories.find(c => c.id === e.categorie);
         const label = cat ? cat.libelle : (e.categorie ? e.categorie.charAt(0).toUpperCase() + e.categorie.slice(1) : "Autre");
-        totalDepList[label] = (totalDepList[label] || 0) + Number(e.montant);
+        const montant = Math.abs(Number(e.montant)) || 0;
+        totalDepList[label] = (totalDepList[label] || 0) + montant;
         if (!totalDepItemsMap[label]) totalDepItemsMap[label] = [];
         totalDepItemsMap[label].push({
             date: e.date,
-            description: e.description,
-            montant: Number(e.montant),
+            description: (e.description || "").replace(/^\[Déduction Réserve\]\s*/i, "").trim(),
+            montant: montant,
             paye_a: e.paye_a || "--",
             paye: e.paye
         });
-        grandTotalDep += Number(e.montant);
+        grandTotalDep += montant;
     });
 
     // 5. Other expenses from general transactions linked to this manifestation
-    const syncedExpTxIds = new Set(expenses.map(e => e.transaction_id));
+    const syncedExpTxIds = new Set(expenses.map(e => e.transaction_id || e.reserve_transaction_id).filter(Boolean));
     STATE.transactions.forEach(t => {
         if (t.manifestation_id === activeManifestationId && t.type_flux === "Dépense" && t.paye) {
             if (!syncedExpTxIds.has(t.id)) {
                 const cat = STATE.categories.find(c => c.id === t.categorie_id);
                 const label = cat ? cat.libelle : "Autre dépense";
-                totalDepList[label] = (totalDepList[label] || 0) + Number(t.montant);
+                const amt = Math.abs(Number(t.montant)) || 0;
+                totalDepList[label] = (totalDepList[label] || 0) + amt;
                 if (!totalDepItemsMap[label]) totalDepItemsMap[label] = [];
                 totalDepItemsMap[label].push({
                     date: t.date_transaction,
-                    description: t.description,
-                    montant: Number(t.montant),
+                    description: (t.description || "").replace(/^\[Déduction Réserve\]\s*/i, "").trim(),
+                    montant: amt,
                     paye_a: "Comptabilité générale",
                     paye: t.paye
                 });
-                grandTotalDep += Number(t.montant);
+                grandTotalDep += amt;
             }
         }
     });
@@ -6191,7 +6305,7 @@ function renderFeteRurale() {
     // Calculate total expenses for the badge
     let sumExpenses = 0;
     expenses.forEach(e => {
-        sumExpenses += Number(e.montant) || 0;
+        sumExpenses += Math.abs(Number(e.montant)) || 0;
     });
     const expTotalBadge = document.getElementById("fete-expenses-total-badge");
     if (expTotalBadge) {
@@ -6209,8 +6323,8 @@ function renderFeteRurale() {
                 valA = new Date(a.date);
                 valB = new Date(b.date);
             } else if (sortField === 'montant' || sortField === 'paye') {
-                valA = Number(a[sortField]) || 0;
-                valB = Number(b[sortField]) || 0;
+                valA = Math.abs(Number(a[sortField])) || 0;
+                valB = Math.abs(Number(b[sortField])) || 0;
             } else {
                 valA = (a[sortField] || "").toString().toLowerCase();
                 valB = (b[sortField] || "").toString().toLowerCase();
@@ -6253,13 +6367,16 @@ function renderFeteRurale() {
                 chequeBadge = `<br><span class="badge" style="background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeBorder}; margin-top: 3px; font-size: 0.73rem; font-weight: 600; cursor: pointer;" onclick="toggleFeteExpenseChequeEncaisse('${e.id}', event)" title="Chèque : Cliquer pour cocher/décocher l'encaissement">💳 ${numStr || 'N° non répertorié'} • <i data-lucide="${iconName}" style="width: 11px; height: 11px; vertical-align: middle; margin-right: 2px;"></i> ${statusText}</span>`;
             }
 
+            const cleanDesc = (e.description || "").replace(/^\[Déduction Réserve\]\s*/i, "").trim();
+            const expAmount = Math.abs(Number(e.montant) || 0).toFixed(2);
+
             expensesTable.innerHTML += `
                 <tr>
                     <td>${formatDateFrench(new Date(e.date))}</td>
-                    <td style="font-weight: 500;">${e.description}</td>
+                    <td style="font-weight: 500;">${cleanDesc}</td>
                     <td>${catLabel}</td>
-                    <td>${e.paye_a}</td>
-                    <td style="color: var(--danger); font-weight: 600;">${Number(e.montant).toFixed(2)} €</td>
+                    <td>${e.paye_a || '--'}</td>
+                    <td style="color: var(--danger); font-weight: 600;">${expAmount} €</td>
                     <td>${e.moyen_payement}${chequeBadge}</td>
                     <td>${paidBadge}</td>
                     <td>${scanBtn}</td>
