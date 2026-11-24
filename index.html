@@ -16,19 +16,19 @@
             errDiv.textContent += '\nError: ' + e.message + ' at ' + e.filename + ':' + e.lineno + ':' + e.colno;
         });
     </script>
-    <link rel="stylesheet" href="index.css?v=8.10">
+    <link rel="stylesheet" href="index.css?v=8.11">
     
     <!-- Favicon & PWA Icons -->
-    <link rel="icon" type="image/png" href="logo.png?v=8.10">
-    <link rel="shortcut icon" type="image/png" href="logo.png?v=8.10">
-    <link rel="manifest" href="manifest.json?v=8.10">
-    <link rel="apple-touch-icon" href="logo.png?v=8.10">
+    <link rel="icon" type="image/png" href="logo.png?v=8.11">
+    <link rel="shortcut icon" type="image/png" href="logo.png?v=8.11">
+    <link rel="manifest" href="manifest.json?v=8.11">
+    <link rel="apple-touch-icon" href="logo.png?v=8.11">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js?v=8.10')
+                navigator.serviceWorker.register('sw.js?v=8.11')
                     .then(reg => {
                         console.log('Service Worker registered successfully!', reg);
                         reg.update(); // Force immediate update check on load
@@ -52,7 +52,7 @@
     <!-- SheetJS CDN for Excel (.xlsx) Import/Export -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- Lucide Icons (Local Bundle) -->
-    <script src="lucide.min.js?v=8.10"></script>
+    <script src="lucide.min.js?v=8.11"></script>
     <!-- Supabase JS Client v2 (100% Cloud Backend) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -61,7 +61,7 @@
     <div id="login-screen" style="display: none;">
         <div class="login-box">
             <div class="login-header">
-                <img src="logo.png?v=8.10" alt="Logo" class="login-logo" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px;" id="login-logo-img">
+                <img src="logo.png?v=8.11" alt="Logo" class="login-logo" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px;" id="login-logo-img">
                 <h2>Foyer Rural d'Esnoms au Val</h2>
                 <p>Espace d'Administration Sécurisé</p>
             </div>
@@ -91,7 +91,7 @@
                 <i data-lucide="menu" style="width: 20px; height: 20px;"></i>
             </button>
             <div style="display: flex; align-items: center; gap: 8px;">
-                <img id="mobile-header-logo" src="logo.png?v=8.10" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;" />
+                <img id="mobile-header-logo" src="logo.png?v=8.11" style="width: 28px; height: 28px; object-fit: contain; border-radius: 4px;" />
                 <span style="font-weight: 700; font-size: 0.95rem; color: var(--text-main);">Foyer Rural</span>
             </div>
             <div style="width: 36px;"></div>
@@ -104,7 +104,7 @@
         <aside class="sidebar">
             <div class="logo-container" style="border-bottom: none; padding-bottom: 0; display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px;">
                 <div class="logo-details" style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
-                    <img id="sidebar-logo" src="logo.png?v=8.10" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
+                    <img id="sidebar-logo" src="logo.png?v=8.11" style="width: 32px; height: 32px; object-fit: contain; border-radius: 4px;" />
                     <span class="logo-title" style="white-space: nowrap;">Foyer Rural d'Esnoms au Val</span>
                 </div>
                 <!-- Sidebar Toggle Button (Inside Sidebar Logo Container) -->
@@ -159,6 +159,14 @@
                     <div class="header-title">
                         <h1>Bonjour !</h1>
                         <p>Voici un aperçu de l'état du Foyer Rural aujourd'hui.</p>
+                    </div>
+                    <div class="header-actions" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                        <button type="button" class="btn btn-success" onclick="openNewTransactionModal('Recette')" style="padding: 7px 14px; font-weight: 600; font-size: 0.85rem;" title="Ajouter une Recette (+)">
+                            <i data-lucide="plus" style="width: 16px; height: 16px;"></i> Recette
+                        </button>
+                        <button type="button" class="btn btn-danger" onclick="openNewTransactionModal('Dépense')" style="padding: 7px 14px; font-weight: 600; font-size: 0.85rem;" title="Ajouter une Dépense (-)">
+                            <i data-lucide="minus" style="width: 16px; height: 16px;"></i> Dépense
+                        </button>
                     </div>
                 </div>
                 
@@ -330,9 +338,12 @@
                         <h1>Comptabilité & Factures</h1>
                         <p>Suivez les recettes, les dépenses, éditez des factures et analysez les bilans annuels.</p>
                     </div>
-                    <div class="header-actions">
-                        <button class="btn btn-primary" onclick="openNewTransactionModal()">
-                            <i data-lucide="plus-circle"></i> Saisir Transaction
+                    <div class="header-actions" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                        <button type="button" class="btn btn-success" onclick="openNewTransactionModal('Recette')" style="padding: 7px 14px; font-weight: 600; font-size: 0.85rem;" title="Ajouter une Recette (+)">
+                            <i data-lucide="plus" style="width: 16px; height: 16px;"></i> Recette
+                        </button>
+                        <button type="button" class="btn btn-danger" onclick="openNewTransactionModal('Dépense')" style="padding: 7px 14px; font-weight: 600; font-size: 0.85rem;" title="Ajouter une Dépense (-)">
+                            <i data-lucide="minus" style="width: 16px; height: 16px;"></i> Dépense
                         </button>
                     </div>
                 </div>
@@ -999,13 +1010,13 @@
                     <!-- Version & Release Info Panel -->
                     <div class="glass-panel" style="grid-column: 1 / -1; display: flex; gap: 24px; align-items: flex-start; padding: 24px;">
                         <div style="background: rgba(99, 102, 241, 0.1); color: var(--primary); padding: 8px 14px; border-radius: 8px; font-weight: 700; font-family: monospace; font-size: 1.1rem; flex-shrink: 0; border: 1px solid rgba(99, 102, 241, 0.2);">
-                            v8.10
+                            v8.11
                         </div>
                         <div style="flex: 1;">
                             <h2 style="margin-top: 0; margin-bottom: 6px; font-size: 1.15rem; font-weight: 600; color: var(--text-main);">Version & Dernières Modifications</h2>
                             <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px; font-weight: 500;">Mise à jour : 24 novembre 2026</div>
                             <p style="color: var(--text-muted); margin: 0; font-size: 0.9rem; line-height: 1.5;">
-                                🚀 <strong>Tri Dynamique de la Liste des Adhérents (v8.10)</strong> : La liste des membres et adhérents peut désormais être triée dynamiquement par un simple clic sur les en-têtes de colonnes (Nom par ordre alphabétique A-Z / Z-A, N° Adhérent, Email, Date d'Adhésion, Statut de Cotisation et Gestanet), avec indicateurs visuels de direction (▲ / ▼).
+                                🚀 <strong>Boutons dédiés + Recette et - Dépense (v8.11)</strong> : Remplacement du bouton unique par deux boutons distincts « + Recette » (vert) et « - Dépense » (rouge) disponibles dans la Comptabilité ainsi que sur la Page d'accueil. Le formulaire de saisie verrouille désormais automatiquement le type de flux correspondant, éliminant tout risque d'erreur.
                             </p>
                         </div>
                     </div>
@@ -1665,11 +1676,11 @@
                 <input type="hidden" id="transaction-id">
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="transaction-flux">Type de Flux</label>
-                        <select id="transaction-flux" onchange="toggleTransactionDetails(); updateTransactionCategoriesDropdown();">
-                            <option value="Recette">Recette</option>
-                            <option value="Dépense">Dépense</option>
-                        </select>
+                        <label>Type de Flux</label>
+                        <input type="hidden" id="transaction-flux" value="Dépense">
+                        <div id="transaction-flux-display" style="display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 6px; font-weight: 600; font-size: 0.9rem; user-select: none;">
+                            <span id="transaction-flux-text"></span>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="transaction-date">Date de Transaction</label>
@@ -2272,6 +2283,6 @@
     <!-- Expense Category Hover Popover -->
     <div id="expense-category-popover" class="category-popover"></div>
 
-    <script src="app.js?v=8.10"></script>
+    <script src="app.js?v=8.11"></script>
 </body>
 </html>

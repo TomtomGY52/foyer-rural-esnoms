@@ -1,6 +1,6 @@
 // ============================================================================
 // Safe Lucide icon rendering helper
-const APP_VERSION = "8.10";
+const APP_VERSION = "8.11";
 
 function safeCreateIcons() {
     if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
@@ -2457,7 +2457,6 @@ function editTransaction(id) {
     populateSelectOptions(t.manifestation_id || "");
 
     document.getElementById("transaction-id").value = t.id;
-    document.getElementById("transaction-flux").value = t.type_flux;
     document.getElementById("transaction-date").value = t.date_transaction;
     document.getElementById("transaction-moyen").value = t.moyen_payement || "Espèces";
     document.getElementById("transaction-prix").value = t.prix;
@@ -2482,12 +2481,15 @@ function editTransaction(id) {
         document.getElementById("transaction-equipement").value = t.equipement_id || "";
     }
     
+    const flux = t.type_flux || "Dépense";
+    setTransactionFluxDisplay(flux);
+
     // Dynamically filter categories based on the context of this transaction
     updateTransactionCategoriesDropdown();
     // Then set the selected category ID
     document.getElementById("transaction-categorie").value = t.categorie_id;
     
-    document.getElementById("transaction-modal-title").innerText = "Modifier la Transaction";
+    document.getElementById("transaction-modal-title").innerText = (flux === "Recette") ? "Modifier la Recette" : "Modifier la Dépense";
     openModal("modal-transaction");
 }
 
@@ -2600,14 +2602,26 @@ function toggleTransactionPaid(id) {
 
 // Show/hide fields depending on transaction type
 function toggleTransactionDetails() {
-    const flux = document.getElementById("transaction-flux").value;
+    const fluxInput = document.getElementById("transaction-flux");
+    const flux = fluxInput ? fluxInput.value : "Dépense";
     const catSelect = document.getElementById("transaction-categorie");
+    if (!catSelect) return;
     
     // Autofill category suggestions depending on flow
     if (flux === "Recette") {
-        catSelect.value = "cat-1"; // Cotisations
+        const hasCat1 = Array.from(catSelect.options).some(o => o.value === "cat-1");
+        if (hasCat1) {
+            catSelect.value = "cat-1";
+        } else if (catSelect.options.length > 0) {
+            catSelect.value = catSelect.options[0].value;
+        }
     } else {
-        catSelect.value = "cat-9"; // Dépenses Générales
+        const hasCat9 = Array.from(catSelect.options).some(o => o.value === "cat-9");
+        if (hasCat9) {
+            catSelect.value = "cat-9";
+        } else if (catSelect.options.length > 0) {
+            catSelect.value = catSelect.options[0].value;
+        }
     }
 }
 
@@ -4821,10 +4835,44 @@ function updateTransactionCategoriesDropdown() {
     }
 }
 
-function openNewTransactionModal() {
+function setTransactionFluxDisplay(flux) {
+    const fluxInput = document.getElementById("transaction-flux");
+    if (fluxInput) fluxInput.value = flux;
+    
+    const displayEl = document.getElementById("transaction-flux-display");
+    const textEl = document.getElementById("transaction-flux-text");
+    if (displayEl && textEl) {
+        if (flux === "Recette") {
+            displayEl.style.background = "rgba(16, 185, 129, 0.12)";
+            displayEl.style.color = "var(--secondary)";
+            displayEl.style.border = "1px solid rgba(16, 185, 129, 0.3)";
+            textEl.innerHTML = `<i data-lucide="plus-circle" style="width: 18px; height: 18px; vertical-align: middle;"></i> <strong>Recette</strong> (Entrée d'argent)`;
+        } else {
+            displayEl.style.background = "rgba(239, 68, 68, 0.12)";
+            displayEl.style.color = "var(--danger)";
+            displayEl.style.border = "1px solid rgba(239, 68, 68, 0.3)";
+            textEl.innerHTML = `<i data-lucide="minus-circle" style="width: 18px; height: 18px; vertical-align: middle;"></i> <strong>Dépense</strong> (Sortie d'argent)`;
+        }
+        safeCreateIcons();
+    }
+}
+
+function openNewTransactionModal(fixedType = "Dépense") {
+    const flux = (fixedType === "Recette") ? "Recette" : "Dépense";
+
+    // If on Comptabilité tab, automatically switch to the matching sub-tab
+    const comptabilitePane = document.getElementById("tab-comptabilite");
+    if (comptabilitePane && comptabilitePane.classList.contains("active")) {
+        const targetSubtab = (flux === "Recette") ? "recettes-generales" : "depenses-generales";
+        const subBtn = comptabilitePane.querySelector(`.sub-tab-btn[data-subtab="${targetSubtab}"]`);
+        if (subBtn && !subBtn.classList.contains("active")) {
+            subBtn.click();
+        }
+    }
+
     document.getElementById("form-transaction").reset();
     document.getElementById("transaction-id").value = "";
-    document.getElementById("transaction-modal-title").innerText = "Nouvelle Transaction";
+    document.getElementById("transaction-modal-title").innerText = (flux === "Recette") ? "Nouvelle Recette" : "Nouvelle Dépense";
     
     document.getElementById("transaction-date").value = formatDate(new Date());
     document.getElementById("transaction-quantite").value = 1;
@@ -4832,8 +4880,11 @@ function openNewTransactionModal() {
     document.getElementById("transaction-montant").value = "";
     document.getElementById("transaction-paye").checked = true;
     
-    toggleTransactionDetails();
+    setTransactionFluxDisplay(flux);
     updateTransactionCategoriesDropdown();
+    toggleTransactionDetails();
+    toggleChequeFields('transaction');
+    
     openModal("modal-transaction");
 }
 
